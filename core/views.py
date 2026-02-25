@@ -43,3 +43,61 @@ def health_check(request):
         'app': 'Arni Medica eQMS',
         'debug': settings.DEBUG,
     })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def setup_initial_data(request):
+    """
+    One-time setup endpoint to create superuser and seed reference data.
+    Protected by setup secret key.
+    """
+    setup_key = request.data.get('setup_key', '')
+    if setup_key != 'arni-medica-setup-2026':
+        return Response({'error': 'Invalid setup key'}, status=403)
+
+    from django.contrib.auth.models import User
+    from django.core.management import call_command
+    import io
+
+    results = {}
+
+    # Create superuser if not exists
+    if not User.objects.filter(username='admin').exists():
+        User.objects.create_superuser(
+            username='admin',
+            email='admin@arnimedica.com',
+            password='admin123',
+            first_name='Admin',
+            last_name='User'
+        )
+        results['superuser'] = 'Created admin user'
+    else:
+        results['superuser'] = 'Admin user already exists'
+
+    # Create additional test users
+    test_users = [
+        ('qa_manager', 'qa@arnimedica.com', 'QA', 'Manager'),
+        ('doc_controller', 'docs@arnimedica.com', 'Document', 'Controller'),
+        ('training_admin', 'training@arnimedica.com', 'Training', 'Admin'),
+        ('capa_owner', 'capa@arnimedica.com', 'CAPA', 'Owner'),
+    ]
+    users_created = 0
+    for username, email, first, last in test_users:
+        if not User.objects.filter(username=username).exists():
+            User.objects.create_user(
+                username=username, email=email, password='test123',
+                first_name=first, last_name=last
+            )
+            users_created += 1
+    results['test_users'] = f'Created {users_created} test users'
+
+    # Run seed data command
+    output = io.StringIO()
+    try:
+        call_command('seed_data', stdout=output)
+        results['seed_data'] = output.getvalue().strip()
+    except Exception as e:
+        results['seed_data'] = f'Error: {str(e)}'
+
+    return Response(results)
