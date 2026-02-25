@@ -1,54 +1,47 @@
 from django.contrib import admin
-from .models import CAPA, CAPAAction
+from .models import CAPA, CAPAApproval, CAPADocument, CAPAComment
+
+
+class CAPAApprovalInline(admin.TabularInline):
+    model = CAPAApproval
+    fields = ('phase', 'approver', 'status', 'sequence')
+    extra = 0
+
+
+class CAPADocumentInline(admin.TabularInline):
+    model = CAPADocument
+    fields = ('phase', 'document_type', 'title')
+    extra = 0
 
 
 @admin.register(CAPA)
 class CAPAAdmin(admin.ModelAdmin):
-    list_display = ['capa_id', 'title', 'status', 'priority', 'owner', 'due_date', 'created_at']
-    list_filter = ['status', 'priority', 'source', 'created_at']
-    search_fields = ['capa_id', 'title', 'description']
-    readonly_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('capa_id', 'title', 'source', 'priority', 'owner')
-        }),
-        ('Status & Dates', {
-            'fields': ('status', 'due_date', 'completed_date')
-        }),
-        ('Details', {
-            'fields': ('description', 'root_cause', 'root_cause_analysis_method')
-        }),
-        ('Actions', {
-            'fields': ('corrective_actions', 'preventive_actions')
-        }),
-        ('Verification', {
-            'fields': ('verification_method', 'verification_results', 'verification_date')
-        }),
-        ('AI Insights', {
-            'fields': ('ai_root_cause', 'ai_confidence')
-        }),
-        ('Audit Trail', {
-            'fields': ('created_at', 'updated_at', 'created_by', 'updated_by'),
-            'classes': ('collapse',)
-        }),
-    )
+    list_display = ('capa_id', 'title', 'source', 'priority', 'current_phase', 'created_at')
+    list_filter = ('source', 'priority', 'current_phase', 'capa_type', 'created_at')
+    search_fields = ('capa_id', 'title', 'description')
+    ordering = ['-created_at']
+    inlines = [CAPAApprovalInline, CAPADocumentInline]
 
 
-@admin.register(CAPAAction)
-class CAPAActionAdmin(admin.ModelAdmin):
-    list_display = ['capa', 'action_type', 'responsible', 'status', 'target_date', 'completion_date']
-    list_filter = ['action_type', 'status', 'target_date', 'created_at']
-    search_fields = ['capa__capa_id', 'description']
-    readonly_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('capa', 'action_type', 'description', 'responsible')
-        }),
-        ('Dates', {
-            'fields': ('target_date', 'completion_date', 'status')
-        }),
-        ('Audit Trail', {
-            'fields': ('created_at', 'updated_at', 'created_by', 'updated_by'),
-            'classes': ('collapse',)
-        }),
-    )
+@admin.register(CAPAApproval)
+class CAPAApprovalAdmin(admin.ModelAdmin):
+    list_display = ('capa', 'phase', 'approver', 'status', 'responded_at')
+    list_filter = ('phase', 'status', 'approval_tier')
+    search_fields = ('capa__capa_id', 'approver__username')
+    ordering = ['sequence']
+
+
+@admin.register(CAPADocument)
+class CAPADocumentAdmin(admin.ModelAdmin):
+    list_display = ('capa', 'phase', 'document_type', 'title', 'uploaded_at')
+    list_filter = ('phase', 'document_type', 'uploaded_at')
+    search_fields = ('capa__capa_id', 'title')
+    ordering = ['-uploaded_at']
+
+
+@admin.register(CAPAComment)
+class CAPACommentAdmin(admin.ModelAdmin):
+    list_display = ('capa', 'author', 'phase', 'created_at')
+    list_filter = ('phase', 'created_at')
+    search_fields = ('capa__capa_id', 'author__username', 'comment')
+    ordering = ['-created_at']

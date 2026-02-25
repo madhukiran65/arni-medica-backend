@@ -1,0 +1,309 @@
+================================================================================
+ARNI MEDICA eQMS - DEPLOYMENT QUICK START GUIDE
+================================================================================
+
+For complete details, see DEPLOYMENT.md
+
+================================================================================
+1. LOCAL DEVELOPMENT (Docker Compose)
+================================================================================
+
+Prerequisites: Docker and Docker Compose
+
+Steps:
+  1. cp .env.example .env
+  2. docker-compose up -d
+  3. docker-compose exec web python manage.py migrate
+  4. docker-compose exec web python manage.py seed_data
+  5. docker-compose exec web python manage.py createsuperuser
+
+Access:
+  - API: http://localhost:8000/api/
+  - Admin: http://localhost:8000/admin/
+  - Health Check: http://localhost:8000/api/health/
+  - Database: localhost:5432 (user: arni_admin)
+  - Redis: localhost:6379
+
+Stop Services:
+  docker-compose down
+
+View Logs:
+  docker-compose logs -f web
+
+================================================================================
+2. RAILWAY.APP DEPLOYMENT
+================================================================================
+
+Prerequisites: GitHub account, Railway.app account
+
+Steps:
+  1. Push code to GitHub
+  2. Go to Railway.app and create new project
+  3. Connect GitHub repository
+  4. Set environment variables in Railway Dashboard:
+     - SECRET_KEY (generate strong random value)
+     - DEBUG=False
+     - ALLOWED_HOSTS=yourdomain.com
+     - CORS_ALLOWED_ORIGINS=https://yourdomain.com
+  5. Deploy (automatic on git push)
+  6. Check health: https://yourdomain.com/api/health/
+
+Environment Variables:
+  Required:
+    - SECRET_KEY (change from default!)
+    - DEBUG (set to False for production)
+    - ALLOWED_HOSTS (your domain)
+
+  Auto-configured by Railway:
+    - DATABASE_URL
+    - REDIS_URL
+
+================================================================================
+3. HEROKU DEPLOYMENT
+================================================================================
+
+Prerequisites: Heroku CLI, Heroku account
+
+Steps:
+  1. heroku login
+  2. heroku create your-app-name
+  3. heroku addons:create heroku-postgresql:standard-0
+  4. heroku addons:create heroku-redis:premium-0
+  5. heroku config:set SECRET_KEY="your-secret-key"
+  6. heroku config:set DEBUG=False
+  7. heroku config:set ALLOWED_HOSTS=your-app-name.herokuapp.com
+  8. git push heroku main
+  9. heroku run python manage.py migrate
+  10. heroku run python manage.py seed_data
+
+View Logs:
+  heroku logs --tail
+
+================================================================================
+4. MANUAL SERVER DEPLOYMENT (VPS)
+================================================================================
+
+System Requirements:
+  - Ubuntu 20.04+ or similar Linux distribution
+  - 2GB+ RAM
+  - 10GB+ disk space
+  - PostgreSQL 12+
+  - Redis 5+
+  - Python 3.11+
+
+Complete Guide: See DEPLOYMENT.md
+
+Quick Summary:
+  1. apt-get update && apt-get install python3.11 postgresql redis-server nginx
+  2. Create PostgreSQL database and user
+  3. Clone repository
+  4. Create virtual environment: python3.11 -m venv venv
+  5. source venv/bin/activate
+  6. pip install -r requirements.txt
+  7. cp .env.example .env (edit with production values)
+  8. python manage.py migrate
+  9. python manage.py seed_data
+  10. python manage.py collectstatic --noinput
+  11. Configure Supervisor for process management
+  12. Configure Nginx reverse proxy
+  13. Install SSL certificate with Let's Encrypt
+
+================================================================================
+ENVIRONMENT VARIABLES (Production)
+================================================================================
+
+Essential:
+  SECRET_KEY=<generate-strong-random-string>
+  DEBUG=False
+  ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+
+Database:
+  DATABASE_URL=postgres://user:password@localhost:5432/arni_eqms
+
+Redis/Celery:
+  REDIS_URL=redis://localhost:6379/0
+  CELERY_BROKER_URL=redis://localhost:6379/0
+
+CORS:
+  CORS_ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+
+Email (Optional):
+  EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+  EMAIL_HOST=smtp.gmail.com
+  EMAIL_PORT=587
+  EMAIL_USE_TLS=True
+  EMAIL_HOST_USER=your-email@gmail.com
+  EMAIL_HOST_PASSWORD=your-app-password
+
+================================================================================
+HEALTH CHECK
+================================================================================
+
+Endpoint: GET /api/health/
+
+Example Response:
+  {
+    "status": "healthy",
+    "database": "healthy",
+    "version": "1.0.0",
+    "app": "Arni Medica eQMS",
+    "debug": false
+  }
+
+Use with:
+  - Load balancers
+  - Docker health checks
+  - Monitoring systems (Datadog, New Relic, etc.)
+
+================================================================================
+MANAGEMENT COMMANDS
+================================================================================
+
+Run Migrations:
+  python manage.py migrate
+
+Seed Initial Data:
+  python manage.py seed_data
+
+Create Superuser:
+  python manage.py createsuperuser
+
+Collect Static Files:
+  python manage.py collectstatic --noinput
+
+Clear Cache:
+  python manage.py clear_cache
+
+View Logs:
+  python manage.py shell_plus
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Database Connection Error:
+  - Check DATABASE_URL environment variable
+  - Verify PostgreSQL is running
+  - Check database credentials
+  - Test: psql -h localhost -U arni_admin -d arni_eqms
+
+Celery Not Processing Tasks:
+  - Check REDIS_URL environment variable
+  - Verify Redis is running
+  - Check Celery worker logs
+  - Restart Celery worker
+
+Static Files Not Loading:
+  - Run: python manage.py collectstatic --noinput --clear
+  - Check file permissions
+  - Verify STATIC_ROOT setting
+  - Restart web server
+
+Health Check Failing:
+  - Check database connectivity
+  - Verify all environment variables are set
+  - Check application logs
+  - Ensure Django is running
+
+================================================================================
+MONITORING CHECKLIST
+================================================================================
+
+Daily:
+  [ ] Check health endpoint status
+  [ ] Monitor error logs
+  [ ] Verify database is responsive
+  [ ] Check available disk space
+
+Weekly:
+  [ ] Review application logs
+  [ ] Check Celery task queue
+  [ ] Verify Redis cache performance
+  [ ] Update dependencies (if needed)
+
+Monthly:
+  [ ] Create database backup
+  [ ] Review security logs
+  [ ] Update SSL certificate if needed
+  [ ] Performance analysis
+
+================================================================================
+SECURITY CHECKLIST
+================================================================================
+
+Before Production:
+  [ ] Change SECRET_KEY to strong random value
+  [ ] Set DEBUG=False
+  [ ] Configure ALLOWED_HOSTS with actual domain
+  [ ] Set up HTTPS/SSL certificate
+  [ ] Configure CORS_ALLOWED_ORIGINS correctly
+  [ ] Set strong database password
+  [ ] Enable database backups
+  [ ] Set up monitoring/alerting
+  [ ] Configure email backend
+  [ ] Review and test all endpoints
+  [ ] Create superuser account
+
+Production Ongoing:
+  [ ] Monitor error logs daily
+  [ ] Keep dependencies updated
+  [ ] Perform regular backups
+  [ ] Review access logs
+  [ ] Update SSL certificates before expiry
+
+================================================================================
+USEFUL LINKS
+================================================================================
+
+Django Documentation:
+  https://docs.djangoproject.com/
+
+Django REST Framework:
+  https://www.django-rest-framework.org/
+
+Celery Documentation:
+  https://docs.celeryproject.org/
+
+Railway.app Documentation:
+  https://docs.railway.app/
+
+Heroku Documentation:
+  https://devcenter.heroku.com/
+
+PostgreSQL Documentation:
+  https://www.postgresql.org/docs/
+
+Redis Documentation:
+  https://redis.io/documentation
+
+================================================================================
+DEPLOYMENT SUMMARY FILES
+================================================================================
+
+DEPLOYMENT.md
+  - Complete deployment guide
+  - Step-by-step instructions for all platforms
+  - Troubleshooting and maintenance
+
+DEPLOYMENT_SUMMARY.md
+  - Overview of all deployment files
+  - Configuration options
+  - Environment variables reference
+
+DEPLOYMENT_QUICKSTART.txt (this file)
+  - Quick reference guide
+  - Essential commands
+  - Troubleshooting quick tips
+
+DEPLOYMENT_FILES_CHECKLIST.txt
+  - Complete file inventory
+  - Features summary
+  - Verification results
+
+================================================================================
+
+For detailed deployment instructions, see DEPLOYMENT.md
+For file inventory and features, see DEPLOYMENT_FILES_CHECKLIST.txt
+For configuration summary, see DEPLOYMENT_SUMMARY.md
+
+================================================================================
