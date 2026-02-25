@@ -9,8 +9,8 @@ from .models import (
 
 class SupplierCorrectiveActionSerializer(serializers.ModelSerializer):
     """Serializer for supplier corrective actions."""
-    assigned_to_username = serializers.CharField(
-        source='assigned_to.username',
+    verified_by_username = serializers.CharField(
+        source='verified_by.username',
         read_only=True,
         allow_null=True
     )
@@ -20,18 +20,20 @@ class SupplierCorrectiveActionSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'supplier',
-            'description',
-            'action_type',
-            'assigned_to',
-            'assigned_to_username',
-            'due_date',
+            'scar_number',
+            'issue_description',
             'status',
-            'completion_date',
-            'comments',
+            'response_due_date',
+            'response_received_date',
+            'corrective_action',
+            'verification_result',
+            'verified_by',
+            'verified_by_username',
+            'capa',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'assigned_to_username']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'verified_by_username']
 
 
 class SupplierDocumentSerializer(serializers.ModelSerializer):
@@ -44,14 +46,14 @@ class SupplierDocumentSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'supplier',
-            'document_name',
+            'title',
             'document_type',
             'file',
             'file_url',
+            'expiry_date',
             'uploaded_by',
             'uploaded_by_username',
             'uploaded_at',
-            'expiry_date',
         ]
         read_only_fields = ['id', 'uploaded_at', 'uploaded_by_username']
 
@@ -67,8 +69,8 @@ class SupplierDocumentSerializer(serializers.ModelSerializer):
 
 class SupplierEvaluationSerializer(serializers.ModelSerializer):
     """Serializer for supplier evaluations."""
-    evaluated_by_username = serializers.CharField(
-        source='evaluated_by.username',
+    evaluator_username = serializers.CharField(
+        source='evaluator.username',
         read_only=True,
         allow_null=True
     )
@@ -80,16 +82,20 @@ class SupplierEvaluationSerializer(serializers.ModelSerializer):
             'supplier',
             'evaluation_date',
             'evaluation_type',
-            'score',
-            'status',
-            'evaluated_by',
-            'evaluated_by_username',
+            'overall_score',
+            'quality_score',
+            'delivery_score',
+            'service_score',
+            'compliance_score',
+            'evaluator',
+            'evaluator_username',
             'comments',
-            'findings',
+            'recommendation',
+            'next_evaluation_date',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'evaluated_by_username']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'evaluator_username']
 
 
 class SupplierCreateSerializer(serializers.ModelSerializer):
@@ -98,23 +104,29 @@ class SupplierCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
         fields = [
-            'id',
-            'supplier_id',
             'name',
-            'contact_person',
-            'email',
-            'phone_number',
-            'address',
+            'description',
             'supplier_type',
-            'qualification_status',
+            'contact_name',
+            'contact_email',
+            'contact_phone',
+            'address',
+            'city',
+            'state',
+            'country',
+            'postal_code',
+            'website',
+            'department',
+            'quality_contact',
             'risk_level',
-            'created_at',
+            'products_services',
+            'approved_materials',
         ]
-        read_only_fields = ['id', 'supplier_id', 'created_at']
 
 
 class SupplierListSerializer(serializers.ModelSerializer):
     """Compact serializer for listing suppliers."""
+    department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
 
     class Meta:
         model = Supplier
@@ -125,24 +137,24 @@ class SupplierListSerializer(serializers.ModelSerializer):
             'supplier_type',
             'qualification_status',
             'risk_level',
+            'department_name',
+            'next_evaluation_date',
         ]
         read_only_fields = ['id', 'supplier_id']
 
 
 class SupplierDetailSerializer(serializers.ModelSerializer):
     """Full serializer for supplier details with evaluations, documents, and corrective actions."""
+    department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     evaluations = SupplierEvaluationSerializer(
-        source='supplierevaluation_set',
         many=True,
         read_only=True
     )
     documents = SupplierDocumentSerializer(
-        source='supplierdocument_set',
         many=True,
         read_only=True
     )
     corrective_actions = SupplierCorrectiveActionSerializer(
-        source='suppliercorrectiveaction_set',
         many=True,
         read_only=True
     )
@@ -153,15 +165,33 @@ class SupplierDetailSerializer(serializers.ModelSerializer):
             'id',
             'supplier_id',
             'name',
-            'contact_person',
-            'email',
-            'phone_number',
-            'address',
+            'description',
             'supplier_type',
+            'contact_name',
+            'contact_email',
+            'contact_phone',
+            'address',
+            'city',
+            'state',
+            'country',
+            'postal_code',
+            'website',
             'qualification_status',
+            'qualified_date',
+            'next_evaluation_date',
+            'qualification_notes',
             'risk_level',
-            'last_evaluation_date',
-            'notes',
+            'risk_justification',
+            'iso_certified',
+            'iso_certificate_number',
+            'iso_expiry_date',
+            'regulatory_registrations',
+            'gmp_compliant',
+            'products_services',
+            'approved_materials',
+            'department',
+            'department_name',
+            'quality_contact',
             'created_at',
             'updated_at',
             'evaluations',
@@ -173,4 +203,5 @@ class SupplierDetailSerializer(serializers.ModelSerializer):
             'supplier_id',
             'created_at',
             'updated_at',
+            'department_name',
         ]

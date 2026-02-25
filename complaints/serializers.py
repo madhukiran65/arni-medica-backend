@@ -145,7 +145,6 @@ class ComplaintDetailSerializer(serializers.ModelSerializer):
     closed_by_name = serializers.CharField(source='closed_by.get_full_name', read_only=True, allow_null=True)
     attachments = ComplaintAttachmentSerializer(many=True, read_only=True)
     mir_records = MIRRecordSerializer(many=True, read_only=True)
-    comments = serializers.SerializerMethodField()
     root_comments = serializers.SerializerMethodField()
     days_open = serializers.SerializerMethodField()
 
@@ -182,10 +181,6 @@ class ComplaintDetailSerializer(serializers.ModelSerializer):
     def get_root_comments(self, obj):
         root_comments = obj.comments.filter(parent__isnull=True)
         return ComplaintCommentSerializer(root_comments, many=True).data
-
-    def get_comments(self, obj):
-        all_comments = obj.comments.all()
-        return ComplaintCommentSerializer(all_comments, many=True).data
 
     def get_days_open(self, obj):
         end_date = obj.actual_closure_date if obj.actual_closure_date else timezone.now().date()

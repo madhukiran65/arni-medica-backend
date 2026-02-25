@@ -90,6 +90,13 @@ class WorkflowApprovalRequestAdmin(admin.ModelAdmin):
     list_filter = ['status', 'gate__stage']
 
 
+@admin.register(WorkflowApprovalGate)
+class WorkflowApprovalGateAdmin(admin.ModelAdmin):
+    list_display = ['name', 'stage', 'required_role', 'required_count', 'approval_mode', 'sequence']
+    list_filter = ['approval_mode', 'stage__workflow']
+    search_fields = ['name', 'required_role']
+
+
 @admin.register(WorkflowDelegation)
 class WorkflowDelegationAdmin(admin.ModelAdmin):
     list_display = ['delegator', 'delegate', 'start_date', 'end_date', 'is_active']

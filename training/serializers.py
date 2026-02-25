@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.db import models
 from django.utils import timezone
 from decimal import Decimal
 
@@ -66,7 +67,7 @@ class TrainingCourseListSerializer(serializers.ModelSerializer):
         model = TrainingCourse
         fields = [
             'id', 'course_id', 'title', 'course_type', 'course_type_display',
-            'status', 'status_display', 'duration_hours', 'is_mandatory',
+            'status', 'status_display', 'duration_hours', 'category',
             'has_assessment', 'department', 'department_name', 'assignments_count'
         ]
         read_only_fields = ['id']
@@ -220,7 +221,7 @@ class TrainingAssignmentDetailSerializer(serializers.ModelSerializer):
     trainer_verified_by_name = serializers.CharField(source='trainer_verified_by.get_full_name', read_only=True)
     training_plan_name = serializers.CharField(source='training_plan.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    assessment_attempts = AssessmentAttemptSerializer(source='assessment_attempts', many=True, read_only=True)
+    assessment_attempts = AssessmentAttemptSerializer(many=True, read_only=True)
     days_overdue = serializers.SerializerMethodField()
     time_remaining = serializers.SerializerMethodField()
 

@@ -197,8 +197,8 @@ class MIRRecordViewSet(viewsets.ModelViewSet):
     serializer_class = MIRRecordSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['complaint', 'status']
-    ordering_fields = ['created_at', 'due_date']
+    filterset_fields = ['complaint', 'report_type']
+    ordering_fields = ['created_at', 'submitted_date']
     ordering = ['-created_at']
 
     def perform_create(self, serializer):

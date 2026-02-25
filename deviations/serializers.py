@@ -105,7 +105,6 @@ class DeviationDetailSerializer(serializers.ModelSerializer):
     current_stage_display = serializers.CharField(source='get_current_stage_display', read_only=True)
     disposition_display = serializers.CharField(source='get_disposition_display', read_only=True, allow_null=True)
     attachments = DeviationAttachmentSerializer(many=True, read_only=True)
-    comments = serializers.SerializerMethodField()
     days_open = serializers.IntegerField(read_only=True)
     root_comments = serializers.SerializerMethodField()
 
@@ -134,10 +133,6 @@ class DeviationDetailSerializer(serializers.ModelSerializer):
     def get_root_comments(self, obj):
         root_comments = obj.comments.filter(parent__isnull=True)
         return DeviationCommentSerializer(root_comments, many=True).data
-
-    def get_comments(self, obj):
-        all_comments = obj.comments.all()
-        return DeviationCommentSerializer(all_comments, many=True).data
 
 
 # ============================================================================

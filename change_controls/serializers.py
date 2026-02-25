@@ -11,7 +11,7 @@ from .models import (
 class ChangeControlCommentSerializer(serializers.ModelSerializer):
     """Serializer for change control comments with threading support."""
     author_username = serializers.CharField(source='author.username', read_only=True)
-    replies = serializers.SerializerMethodField()
+    replies_list = serializers.SerializerMethodField()
 
     class Meta:
         model = ChangeControlComment
@@ -20,18 +20,17 @@ class ChangeControlCommentSerializer(serializers.ModelSerializer):
             'change_control',
             'author',
             'author_username',
-            'comment_text',
-            'parent_comment',
+            'comment',
+            'parent',
             'created_at',
-            'updated_at',
-            'replies',
+            'replies_list',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'author_username']
+        read_only_fields = ['id', 'created_at', 'author_username']
 
-    def get_replies(self, obj):
+    def get_replies_list(self, obj):
         """Get nested reply comments."""
-        replies = obj.changecontrolcomment_set.all()
-        return ChangeControlCommentSerializer(replies, many=True, read_only=True).data
+        child_replies = obj.replies.all()
+        return ChangeControlCommentSerializer(child_replies, many=True, read_only=True).data
 
 
 class ChangeControlAttachmentSerializer(serializers.ModelSerializer):
@@ -47,7 +46,7 @@ class ChangeControlAttachmentSerializer(serializers.ModelSerializer):
             'file_name',
             'file',
             'file_url',
-            'file_type',
+            'description',
             'uploaded_by',
             'uploaded_by_username',
             'uploaded_at',
@@ -73,13 +72,15 @@ class ChangeControlTaskSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'change_control',
-            'task_description',
+            'title',
+            'description',
             'assigned_to',
             'assigned_to_username',
             'due_date',
             'status',
-            'priority',
-            'completion_date',
+            'sequence',
+            'completed_date',
+            'notes',
             'created_at',
             'updated_at',
         ]
@@ -97,10 +98,12 @@ class ChangeControlApprovalSerializer(serializers.ModelSerializer):
             'change_control',
             'approver',
             'approver_username',
-            'approval_stage',
-            'approval_status',
+            'approval_role',
+            'sequence',
+            'status',
             'comments',
-            'approval_date',
+            'responded_at',
+            'signature',
             'created_at',
             'updated_at',
         ]
@@ -110,7 +113,7 @@ class ChangeControlApprovalSerializer(serializers.ModelSerializer):
 class ApprovalResponseSerializer(serializers.Serializer):
     """Serializer for change control approval responses."""
     status = serializers.ChoiceField(
-        choices=['approved', 'rejected', 'pending'],
+        choices=['approved', 'rejected', 'deferred'],
         help_text='The approval status'
     )
     comments = serializers.CharField(
@@ -120,13 +123,16 @@ class ApprovalResponseSerializer(serializers.Serializer):
     )
     password = serializers.CharField(
         write_only=True,
-        help_text='Password for authentication'
+        help_text='Password for e-signature authentication'
     )
 
 
 class StageTransitionSerializer(serializers.Serializer):
     """Serializer for change control stage transitions."""
-    target_stage = serializers.CharField(help_text='The target stage to transition to')
+    target_stage = serializers.ChoiceField(
+        choices=[s[0] for s in ChangeControl.STAGE_CHOICES],
+        help_text='The target stage to transition to'
+    )
     comments = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -134,7 +140,7 @@ class StageTransitionSerializer(serializers.Serializer):
     )
     password = serializers.CharField(
         write_only=True,
-        help_text='Password for authentication'
+        help_text='Password for e-signature authentication'
     )
 
 
@@ -154,9 +160,14 @@ class ChangeControlCreateSerializer(serializers.ModelSerializer):
             'current_stage',
             'department',
             'justification',
-            'expected_impact',
-            'implementation_date',
+            'impact_summary',
+            'proposed_implementation_date',
             'submitted_date',
+            'affected_areas',
+            'affected_documents',
+            'affected_processes',
+            'affected_products',
+            'is_emergency',
             'created_at',
         ]
         read_only_fields = ['id', 'change_control_id', 'created_at', 'submitted_date']
@@ -165,6 +176,7 @@ class ChangeControlCreateSerializer(serializers.ModelSerializer):
 class ChangeControlListSerializer(serializers.ModelSerializer):
     """Compact serializer for listing change controls."""
     department_name = serializers.CharField(source='department.name', read_only=True)
+    proposed_by_username = serializers.CharField(source='proposed_by.username', read_only=True)
 
     class Meta:
         model = ChangeControl
@@ -177,35 +189,21 @@ class ChangeControlListSerializer(serializers.ModelSerializer):
             'risk_level',
             'current_stage',
             'department_name',
+            'proposed_by_username',
             'submitted_date',
+            'is_emergency',
         ]
-        read_only_fields = ['id', 'change_control_id', 'department_name', 'submitted_date']
+        read_only_fields = fields
 
 
 class ChangeControlDetailSerializer(serializers.ModelSerializer):
     """Full serializer for change control details."""
     department_name = serializers.CharField(source='department.name', read_only=True)
-    approvals = ChangeControlApprovalSerializer(
-        source='changecontrolapproval_set',
-        many=True,
-        read_only=True
-    )
-    tasks = ChangeControlTaskSerializer(
-        source='changecontroltask_set',
-        many=True,
-        read_only=True
-    )
-    attachments = ChangeControlAttachmentSerializer(
-        source='changecontrolattachment_set',
-        many=True,
-        read_only=True
-    )
-    comments = ChangeControlCommentSerializer(
-        source='changecontrolcomment_set',
-        many=True,
-        read_only=True
-    )
-    submitted_by_username = serializers.CharField(source='submitted_by.username', read_only=True)
+    proposed_by_username = serializers.CharField(source='proposed_by.username', read_only=True)
+    approvals = ChangeControlApprovalSerializer(many=True, read_only=True)
+    tasks = ChangeControlTaskSerializer(many=True, read_only=True)
+    attachments = ChangeControlAttachmentSerializer(many=True, read_only=True)
+    comments = ChangeControlCommentSerializer(many=True, read_only=True)
 
     class Meta:
         model = ChangeControl
@@ -218,26 +216,63 @@ class ChangeControlDetailSerializer(serializers.ModelSerializer):
             'change_category',
             'risk_level',
             'current_stage',
+            'stage_entered_at',
+            # Scope
+            'affected_areas',
+            'affected_documents',
+            'affected_processes',
+            'affected_products',
+            # Impact
+            'impact_summary',
+            'quality_impact',
+            'regulatory_impact',
+            'safety_impact',
+            'training_impact',
+            'validation_impact',
+            'documentation_impact',
+            # Planning
             'department',
             'department_name',
+            'proposed_by',
+            'proposed_by_username',
             'justification',
-            'expected_impact',
-            'implementation_date',
-            'submitted_by',
-            'submitted_by_username',
+            'proposed_implementation_date',
+            'actual_implementation_date',
+            'rollback_plan',
+            # Verification
+            'verification_method',
+            'verification_results',
+            'verification_completed',
+            'verified_by',
+            'verified_at',
+            # Assignment
+            'assigned_to',
+            'sponsor',
+            # Linked records
+            'related_capa',
+            'related_deviation',
+            # Dates
             'submitted_date',
+            'target_completion_date',
+            'actual_completion_date',
+            'closed_date',
+            'closed_by',
+            # Flags
+            'requires_validation',
+            'requires_regulatory_notification',
+            'is_emergency',
+            # Related objects
             'approvals',
             'tasks',
             'attachments',
             'comments',
+            # Audit
+            'created_by',
             'created_at',
+            'updated_by',
             'updated_at',
         ]
         read_only_fields = [
-            'id',
-            'change_control_id',
-            'created_at',
-            'updated_at',
-            'department_name',
-            'submitted_by_username',
+            'id', 'change_control_id', 'created_at', 'updated_at',
+            'department_name', 'proposed_by_username',
         ]

@@ -76,7 +76,7 @@ class TrainingPlanViewSet(viewsets.ModelViewSet):
     serializer_class = TrainingPlanSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['department', 'status']
+    filterset_fields = ['job_function', 'is_active', 'is_mandatory']
     ordering_fields = ['name', 'created_at']
     ordering = ['-created_at']
 

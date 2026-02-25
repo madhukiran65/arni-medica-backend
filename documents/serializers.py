@@ -115,13 +115,13 @@ class DocumentApproverSerializer(serializers.ModelSerializer):
             'approver',
             'approver_username',
             'approval_status',
-            'approver_tier',
+            'role_required',
             'sequence',
             'comments',
-            'responded_at',
+            'approved_at',
             'signature',
         ]
-        read_only_fields = ['id', 'responded_at']
+        read_only_fields = ['id', 'approved_at']
 
 
 # ============================================================================
@@ -130,60 +130,49 @@ class DocumentApproverSerializer(serializers.ModelSerializer):
 
 class DocumentSnapshotSerializer(serializers.ModelSerializer):
     """Serializer for DocumentSnapshot with read-only immutable fields."""
-    
+
     class Meta:
         model = DocumentSnapshot
         fields = [
             'id',
             'document',
+            'version_string',
             'snapshot_type',
-            'version_major',
-            'version_minor',
             'snapshot_data',
-            'file_snapshot',
-            'file_hash',
             'created_at',
             'created_by',
         ]
-        read_only_fields = [
-            'id',
-            'snapshot_data',
-            'file_snapshot',
-            'file_hash',
-            'created_at',
-            'created_by',
-        ]
+        read_only_fields = fields
 
 
 class DocumentVersionSerializer(serializers.ModelSerializer):
     """Serializer for DocumentVersion with computed version string."""
-    
+
     version_string = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = DocumentVersion
         fields = [
             'id',
             'document',
-            'version_major',
-            'version_minor',
+            'major_version',
+            'minor_version',
             'version_string',
-            'revision_number',
+            'change_type',
+            'is_major_change',
             'change_summary',
-            'created_at',
-            'created_by',
+            'snapshot_data',
             'released_date',
-            'released_by',
-        ]
-        read_only_fields = [
-            'id',
             'created_at',
             'created_by',
+            'updated_at',
+            'updated_by',
         ]
-    
+        read_only_fields = ['id', 'created_at', 'created_by', 'updated_at', 'updated_by']
+
     def get_version_string(self, obj):
         """Return formatted version string like '2.1'."""
-        return f"{obj.version_major}.{obj.version_minor}"
+        return f"{obj.major_version}.{obj.minor_version}"
 
 
 # ============================================================================
@@ -192,38 +181,41 @@ class DocumentVersionSerializer(serializers.ModelSerializer):
 
 class DocumentChangeOrderSerializer(serializers.ModelSerializer):
     """Serializer for DocumentChangeOrder."""
-    
+
     class Meta:
         model = DocumentChangeOrder
         fields = [
             'id',
             'document',
-            'change_description',
-            'change_type',
-            'priority',
-            'requested_by',
-            'created_at',
-            'impact_assessment',
+            'change_number',
+            'title',
+            'description',
+            'reason_for_change',
+            'proposed_by',
             'status',
-            'approved_by',
-            'approved_at',
+            'impact_assessment',
+            'regulatory_impact',
+            'training_impact',
+            'affected_processes',
+            'implementation_date',
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'approved_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class DocumentChangeApprovalSerializer(serializers.ModelSerializer):
     """Serializer for DocumentChangeApproval."""
-    
+
     class Meta:
         model = DocumentChangeApproval
         fields = [
             'id',
             'change_order',
             'approver',
-            'approval_status',
+            'status',
             'comments',
-            'signature',
-            'responded_at',
+            'approved_at',
         ]
         read_only_fields = ['id', 'responded_at']
 
@@ -306,7 +298,6 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     )
     version_string = serializers.SerializerMethodField()
     versions = DocumentVersionSerializer(
-        source='versions',
         many=True,
         read_only=True
     )
@@ -432,7 +423,6 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             'owner',
             'business_unit',
             'site',
-            'description_text',
             'file',
             'regulatory_requirement',
             'requires_training',

@@ -53,7 +53,7 @@ class ChangeControlViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         # Process stage transition logic here
-        change_control.current_stage = serializer.validated_data['next_stage']
+        change_control.current_stage = serializer.validated_data['target_stage']
         change_control.save()
         
         return Response(

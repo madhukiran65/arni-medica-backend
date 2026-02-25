@@ -18,20 +18,22 @@ class FormQuestionSerializer(serializers.ModelSerializer):
             'section',
             'question_text',
             'question_type',
-            'required',
-            'order',
+            'is_required',
+            'sequence',
             'help_text',
+            'options',
             'validation_rules',
-            'created_at',
-            'updated_at',
+            'default_value',
+            'placeholder',
+            'scoring_weight',
+            'conditions',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id']
 
 
 class FormSectionSerializer(serializers.ModelSerializer):
     """Serializer for form sections with nested questions."""
     questions = FormQuestionSerializer(
-        source='formquestion_set',
         many=True,
         read_only=True
     )
@@ -41,14 +43,14 @@ class FormSectionSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'template',
-            'section_title',
-            'section_description',
-            'order',
+            'title',
+            'description',
+            'sequence',
+            'is_repeatable',
+            'conditions',
             'questions',
-            'created_at',
-            'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id']
 
 
 class FormTemplateListSerializer(serializers.ModelSerializer):
@@ -62,6 +64,8 @@ class FormTemplateListSerializer(serializers.ModelSerializer):
             'template_type',
             'version',
             'is_published',
+            'is_active',
+            'category',
         ]
         read_only_fields = ['id']
 
@@ -69,7 +73,6 @@ class FormTemplateListSerializer(serializers.ModelSerializer):
 class FormTemplateDetailSerializer(serializers.ModelSerializer):
     """Full serializer for form template details with nested sections and questions."""
     sections = FormSectionSerializer(
-        source='formsection_set',
         many=True,
         read_only=True
     )
@@ -84,6 +87,9 @@ class FormTemplateDetailSerializer(serializers.ModelSerializer):
             'template_type',
             'version',
             'is_published',
+            'is_active',
+            'department',
+            'category',
             'created_by',
             'created_by_username',
             'created_at',
@@ -106,17 +112,17 @@ class FormResponseSerializer(serializers.ModelSerializer):
         model = FormResponse
         fields = [
             'id',
-            'form_instance',
+            'instance',
             'question',
             'question_text',
             'response_text',
             'response_number',
             'response_boolean',
             'response_json',
-            'created_at',
-            'updated_at',
+            'response_file',
+            'answered_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'question_text']
+        read_only_fields = ['id', 'answered_at', 'question_text']
 
 
 class FormInstanceListSerializer(serializers.ModelSerializer):
@@ -150,7 +156,6 @@ class FormInstanceDetailSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     responses = FormResponseSerializer(
-        source='formresponse_set',
         many=True,
         read_only=True
     )
@@ -165,6 +170,9 @@ class FormInstanceDetailSerializer(serializers.ModelSerializer):
             'completed_by_username',
             'status',
             'score',
+            'total_possible_score',
+            'context_type',
+            'context_id',
             'completed_at',
             'created_at',
             'updated_at',
