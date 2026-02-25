@@ -45,37 +45,21 @@ class DeviationViewSet(viewsets.ModelViewSet):
 
         if serializer.is_valid():
             try:
-                new_stage = serializer.validated_data.get('new_stage')
-                notes = serializer.validated_data.get('notes', '')
+                target_stage = serializer.validated_data.get('target_stage')
+                comments = serializer.validated_data.get('comments', '')
 
-                # Validate stage transition
-                valid_transitions = {
-                    'draft': ['submitted'],
-                    'submitted': ['investigation', 'rejected'],
-                    'investigation': ['corrective_action', 'closed'],
-                    'corrective_action': ['verification', 'closed'],
-                    'verification': ['closed'],
-                    'rejected': ['draft'],
-                }
-
-                current_stage = deviation.current_stage
-                if new_stage not in valid_transitions.get(current_stage, []):
-                    return Response(
-                        {'error': f'Invalid transition from {current_stage} to {new_stage}'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
+                # Validate stage transition is handled by serializer
                 # Update stage
-                deviation.current_stage = new_stage
+                deviation.current_stage = target_stage
                 deviation.updated_by = request.user
                 deviation.save()
 
                 # Add comment about stage transition
-                if notes:
+                if comments:
                     DeviationComment.objects.create(
                         deviation=deviation,
                         author=request.user,
-                        text=f"Stage transitioned to {new_stage}: {notes}"
+                        comment=f"Stage transitioned to {target_stage}: {comments}"
                     )
 
                 return Response(

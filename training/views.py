@@ -128,7 +128,8 @@ class TrainingAssignmentViewSet(viewsets.ModelViewSet):
                 # Process assessment submission
                 responses = serializer.validated_data.get('responses', [])
                 # Logic to save assessment responses would go here
-                assignment.status = 'assessment_submitted'
+                assignment.status = 'completed'
+                assignment.completion_date = timezone.now()
                 assignment.updated_by = request.user
                 assignment.save()
 
@@ -152,8 +153,7 @@ class TrainingAssignmentViewSet(viewsets.ModelViewSet):
 
         if serializer.is_valid():
             assignment.status = 'completed'
-            assignment.completion_date = timezone.now().date()
-            assignment.passed = serializer.validated_data.get('passed', True)
+            assignment.completion_date = timezone.now()
             assignment.score = serializer.validated_data.get('score')
             assignment.updated_by = request.user
             assignment.save()
@@ -235,27 +235,41 @@ class ComplianceDashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def by_department(self, request):
         """Get compliance statistics by department"""
-        departments = TrainingAssignment.objects.values(
-            'user__profile__department__name'
-        ).annotate(
-            total=Count('id'),
-            completed=Count('id', filter=Q(status='completed')),
-            overdue=Count('id', filter=Q(
-                Q(status__in=['assigned', 'in_progress']) &
-                Q(due_date__lt=timezone.now().date())
-            ))
-        ).order_by('user__profile__department__name')
+        # Get all assignments with related user data
+        assignments = TrainingAssignment.objects.select_related('user')
+
+        dept_stats = {}
+        today = timezone.now().date()
+
+        for assignment in assignments:
+            # Get department from user if available
+            dept_name = 'Unassigned'
+            if hasattr(assignment.user, 'profile') and assignment.user.profile.department:
+                dept_name = assignment.user.profile.department.name
+
+            if dept_name not in dept_stats:
+                dept_stats[dept_name] = {
+                    'total': 0,
+                    'completed': 0,
+                    'overdue': 0
+                }
+
+            dept_stats[dept_name]['total'] += 1
+            if assignment.status == 'completed':
+                dept_stats[dept_name]['completed'] += 1
+            if assignment.status in ['assigned', 'in_progress'] and assignment.due_date.date() < today:
+                dept_stats[dept_name]['overdue'] += 1
 
         data = []
-        for dept in departments:
-            total = dept['total']
-            completed = dept['completed']
+        for dept_name, stats in sorted(dept_stats.items()):
+            total = stats['total']
+            completed = stats['completed']
             compliance_pct = (completed / total * 100) if total > 0 else 0
             data.append({
-                'department': dept['user__profile__department__name'] or 'Unassigned',
+                'department': dept_name,
                 'total': total,
                 'completed': completed,
-                'overdue': dept['overdue'],
+                'overdue': stats['overdue'],
                 'compliance_percentage': round(compliance_pct, 2)
             })
 

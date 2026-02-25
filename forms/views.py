@@ -51,7 +51,7 @@ class FormTemplateViewSet(viewsets.ModelViewSet):
         Duplicate a form template.
         """
         template = self.get_object()
-        
+
         # Create a copy of the template
         new_template = FormTemplate.objects.create(
             name=f"{template.name} (Copy)",
@@ -60,19 +60,20 @@ class FormTemplateViewSet(viewsets.ModelViewSet):
             department=template.department,
             is_published=False,
         )
-        
+
         # Copy associated questions and sections
         for section in template.sections.all():
-            new_section = section.pk = None
-            new_section.form_template = new_template
+            new_section = section
+            new_section.pk = None
+            new_section.template = new_template
             new_section.save()
-            
+
             for question in section.questions.all():
                 new_question = question
                 new_question.pk = None
                 new_question.section = new_section
                 new_question.save()
-        
+
         serializer = self.get_serializer(new_template)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

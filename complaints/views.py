@@ -53,7 +53,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
                 complaint.is_reportable_to_fda = serializer.validated_data.get('is_reportable')
                 complaint.reportability_justification = serializer.validated_data.get('justification', '')
                 complaint.reportability_determined_by = request.user
-                complaint.reportability_determined_date = timezone.now().date()
+                complaint.reportability_determination_date = timezone.now().date()
                 complaint.updated_by = request.user
                 complaint.save()
 
@@ -62,7 +62,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
                     ComplaintComment.objects.create(
                         complaint=complaint,
                         author=request.user,
-                        text=f"Reportability determined: {serializer.validated_data.get('justification')}"
+                        comment=f"Reportability determined: {serializer.validated_data.get('justification')}"
                     )
 
                 return Response(
@@ -87,7 +87,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             try:
                 complaint.mdr_submission_status = 'submitted'
                 complaint.mdr_submission_date = timezone.now().date()
-                complaint.mdr_submission_number = serializer.validated_data.get('mdr_number', '')
+                complaint.mdr_report_number = serializer.validated_data.get('mdr_number', '')
                 complaint.updated_by = request.user
                 complaint.save()
 
@@ -95,7 +95,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
                 ComplaintComment.objects.create(
                     complaint=complaint,
                     author=request.user,
-                    text=f"MDR submitted: {serializer.validated_data.get('mdr_number', '')}"
+                    comment=f"MDR submitted: {serializer.validated_data.get('mdr_number', '')}"
                 )
 
                 return Response(

@@ -152,5 +152,5 @@ class ChangeControlViewSet(viewsets.ModelViewSet):
         elif request.method == 'POST':
             serializer = ChangeControlCommentSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            serializer.save(change_control=change_control, created_by=request.user)
+            serializer.save(change_control=change_control, author=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)

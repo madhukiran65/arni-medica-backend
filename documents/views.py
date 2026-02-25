@@ -48,10 +48,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.select_related(
         'infocard_type',
         'department',
-        'owner',
-        'vault_state'
+        'owner'
     ).prefetch_related(
-        'checkouts',
+        'active_checkout',
         'snapshots',
         'versions',
         'approvers',
@@ -96,7 +95,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 checkout = DocumentCheckout.objects.create(
                     document=document,
                     checked_out_by=request.user,
-                    reason=serializer.validated_data.get('reason', '')
+                    checkout_reason=serializer.validated_data.get('reason', '')
                 )
                 return Response(
                     DocumentCheckoutSerializer(checkout).data,
@@ -122,23 +121,27 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             try:
                 # Release latest checkout
-                checkout = document.checkouts.filter(checked_in_at__isnull=True).first()
-                if not checkout:
+                checkout = document.active_checkout
+                if not checkout or not checkout.is_active:
                     return Response(
                         {'error': 'No active checkout found'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                
+
+                # Increment minor version
+                next_major = document.major_version
+                next_minor = document.minor_version + 1
+
                 # Create new version
                 version = DocumentVersion.objects.create(
                     document=document,
-                    version_number=document.current_version + 1,
-                    changes_made=serializer.validated_data.get('changes_made', ''),
-                    created_by=request.user
+                    major_version=next_major,
+                    minor_version=next_minor,
+                    change_summary=serializer.validated_data.get('changes_made', '')
                 )
-                
+
                 # Update document version
-                document.current_version += 1
+                document.minor_version = next_minor
                 document.save()
                 
                 return Response(
@@ -197,10 +200,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
             # Create or update approver record
             approver, created = DocumentApprover.objects.update_or_create(
                 document=document,
-                approved_by=request.user,
+                approver=request.user,
                 defaults={
                     'signature': signature,
-                    'comment': request.data.get('comment', '')
+                    'comments': request.data.get('comment', '')
                 }
             )
             
@@ -268,7 +271,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def versions(self, request, pk=None):
         """List all versions for a document."""
         document = self.get_object()
-        versions = document.versions.all().order_by('-version_number')
+        versions = document.versions.all().order_by('-major_version', '-minor_version')
         serializer = DocumentVersionSerializer(versions, many=True)
         return Response(serializer.data)
 
@@ -328,9 +331,9 @@ class DocumentChangeOrderViewSet(viewsets.ModelViewSet):
             from .models import DocumentChangeApproval
             approval = DocumentChangeApproval.objects.create(
                 change_order=change_order,
-                approved_by=request.user,
-                signature=signature,
-                comment=request.data.get('comment', '')
+                approver=request.user,
+                status='approved',
+                comments=request.data.get('comment', '')
             )
             
             # Update change order status
