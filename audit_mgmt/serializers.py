@@ -20,13 +20,13 @@ class AuditFindingSerializer(serializers.ModelSerializer):
             'status', 'assigned_capa', 'assigned_capa_id', 'target_closure_date',
             'actual_closure_date', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'finding_id', 'created_at', 'updated_at']
 
 
 class AuditPlanSerializer(serializers.ModelSerializer):
     lead_auditor_name = serializers.CharField(source='lead_auditor.get_full_name', read_only=True)
     findings = AuditFindingSerializer(many=True, read_only=True)
-    
+
     class Meta:
         model = AuditPlan
         fields = [
@@ -36,7 +36,7 @@ class AuditPlanSerializer(serializers.ModelSerializer):
             'findings_count', 'major_nc', 'minor_nc', 'observations',
             'next_audit_planned', 'findings', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'findings_count', 'major_nc', 'minor_nc', 'observations', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'audit_id', 'findings_count', 'major_nc', 'minor_nc', 'observations', 'created_at', 'updated_at']
 
 
 class AuditCloseSerializer(serializers.Serializer):
