@@ -461,6 +461,23 @@ class DocumentChangeOrder(models.Model):
     def __str__(self):
         return f"{self.change_number} - {self.title}"
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate change_number."""
+        if not self.change_number:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'DCO'
+            last = DocumentChangeOrder.objects.filter(change_number__startswith=f'{prefix}-{year}-').order_by('-change_number').first()
+            if last and getattr(last, 'change_number'):
+                try:
+                    seq = int(getattr(last, 'change_number').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.change_number = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
+
 
 class DocumentChangeApproval(models.Model):
     """
@@ -844,21 +861,20 @@ class Document(AuditedModel):
     
     def auto_generate_document_id(self):
         """
-        Generate unique document ID using infocard_type prefix and sequence number.
-        
+        Generate unique document ID using DOC prefix with year and sequence number.
+
         Returns:
-            str: Generated document ID like 'SOP-001', 'DRW-042', etc.
+            str: Generated document ID like 'DOC-2025-0001', 'DOC-2025-0042', etc.
         """
-        if not self.infocard_type:
-            raise ValueError("Infocard type must be set before generating document ID")
-        
-        prefix = self.infocard_type.prefix
-        
-        # Get the next sequence number for this prefix
+        from django.utils import timezone as tz
+        year = tz.now().year
+        prefix = 'DOC'
+
+        # Get the next sequence number for this year
         last_doc = Document.objects.filter(
-            infocard_type=self.infocard_type
+            document_id__startswith=f'{prefix}-{year}-'
         ).order_by('-document_id').first()
-        
+
         if last_doc:
             try:
                 last_num = int(last_doc.document_id.split('-')[-1])
@@ -867,18 +883,18 @@ class Document(AuditedModel):
                 next_num = 1
         else:
             next_num = 1
-        
-        # Format with leading zeros (3-digit format: 001, 002, etc.)
-        document_id = f"{prefix}-{next_num:03d}"
-        
+
+        # Format with leading zeros (4-digit format: 0001, 0002, etc.)
+        document_id = f"{prefix}-{year}-{next_num:04d}"
+
         # Ensure uniqueness
         counter = 1
         original_id = document_id
         while Document.objects.filter(document_id=document_id).exclude(pk=self.pk).exists():
             next_num += counter
-            document_id = f"{prefix}-{next_num:03d}"
+            document_id = f"{prefix}-{year}-{next_num:04d}"
             counter += 1
-        
+
         return document_id
     
     def calculate_file_hash(self):

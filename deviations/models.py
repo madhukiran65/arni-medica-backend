@@ -230,6 +230,23 @@ class Deviation(AuditedModel):
         delta = end_date - self.reported_date
         return delta.days
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate deviation_id."""
+        if not self.deviation_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'DEV'
+            last = Deviation.objects.filter(deviation_id__startswith=f'{prefix}-{year}-').order_by('-deviation_id').first()
+            if last and getattr(last, 'deviation_id'):
+                try:
+                    seq = int(getattr(last, 'deviation_id').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.deviation_id = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
+
 
 class DeviationAttachment(models.Model):
     """File attachments for deviations"""

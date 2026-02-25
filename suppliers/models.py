@@ -107,6 +107,23 @@ class Supplier(AuditedModel):
     def __str__(self):
         return f"{self.name} ({self.supplier_id})"
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate supplier_id."""
+        if not self.supplier_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'SUP'
+            last = Supplier.objects.filter(supplier_id__startswith=f'{prefix}-{year}-').order_by('-supplier_id').first()
+            if last and getattr(last, 'supplier_id'):
+                try:
+                    seq = int(getattr(last, 'supplier_id').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.supplier_id = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
+
 
 class SupplierEvaluation(AuditedModel):
     """Supplier evaluation and scoring records."""
@@ -248,3 +265,20 @@ class SupplierCorrectiveAction(AuditedModel):
     
     def __str__(self):
         return f"{self.scar_number} - {self.supplier.name}"
+
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate scar_number."""
+        if not self.scar_number:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'SCAR'
+            last = SupplierCorrectiveAction.objects.filter(scar_number__startswith=f'{prefix}-{year}-').order_by('-scar_number').first()
+            if last and getattr(last, 'scar_number'):
+                try:
+                    seq = int(getattr(last, 'scar_number').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.scar_number = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)

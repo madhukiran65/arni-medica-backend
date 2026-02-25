@@ -394,6 +394,23 @@ class Complaint(AuditedModel):
     def __str__(self):
         return f"{self.complaint_id} - {self.product_name}"
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate complaint_id."""
+        if not self.complaint_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'CMP'
+            last = Complaint.objects.filter(complaint_id__startswith=f'{prefix}-{year}-').order_by('-complaint_id').first()
+            if last and getattr(last, 'complaint_id'):
+                try:
+                    seq = int(getattr(last, 'complaint_id').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.complaint_id = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
+
 
 class ComplaintAttachment(models.Model):
     """Files and documents associated with complaints"""
@@ -502,6 +519,23 @@ class MIRRecord(AuditedModel):
     
     def __str__(self):
         return f"{self.mir_number} - {self.report_type}"
+
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate mir_number."""
+        if not self.mir_number:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'MIR'
+            last = MIRRecord.objects.filter(mir_number__startswith=f'{prefix}-{year}-').order_by('-mir_number').first()
+            if last and getattr(last, 'mir_number'):
+                try:
+                    seq = int(getattr(last, 'mir_number').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.mir_number = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
 
 
 class ComplaintComment(models.Model):

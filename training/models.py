@@ -148,6 +148,23 @@ class TrainingCourse(AuditedModel):
     def __str__(self):
         return f"{self.course_id} - {self.title}"
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate course_id."""
+        if not self.course_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'CRS'
+            last = TrainingCourse.objects.filter(course_id__startswith=f'{prefix}-{year}-').order_by('-course_id').first()
+            if last and getattr(last, 'course_id'):
+                try:
+                    seq = int(getattr(last, 'course_id').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.course_id = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
+
 
 # ============================================================================
 # 3. TRAINING PLAN - Auto-assign bundles
@@ -303,6 +320,23 @@ class TrainingAssignment(AuditedModel):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.course.title}"
+
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate certificate_number."""
+        if not self.certificate_number and self.certificate_issued:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'CERT'
+            last = TrainingAssignment.objects.filter(certificate_number__startswith=f'{prefix}-{year}-').order_by('-certificate_number').first()
+            if last and getattr(last, 'certificate_number'):
+                try:
+                    seq = int(getattr(last, 'certificate_number').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.certificate_number = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
 
 
 # ============================================================================

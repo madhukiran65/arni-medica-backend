@@ -209,6 +209,23 @@ class ChangeControl(AuditedModel):
     def __str__(self):
         return f"{self.change_control_id}: {self.title}"
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate change_control_id."""
+        if not self.change_control_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'CC'
+            last = ChangeControl.objects.filter(change_control_id__startswith=f'{prefix}-{year}-').order_by('-change_control_id').first()
+            if last and getattr(last, 'change_control_id'):
+                try:
+                    seq = int(getattr(last, 'change_control_id').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.change_control_id = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
+
 
 class ChangeControlApproval(AuditedModel):
     """

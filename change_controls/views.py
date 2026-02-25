@@ -43,6 +43,14 @@ class ChangeControlViewSet(viewsets.ModelViewSet):
             return ApprovalResponseSerializer
         return ChangeControlDetailSerializer
 
+    def perform_create(self, serializer):
+        """Set created_by and updated_by to current user on creation."""
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        """Set updated_by to current user on update."""
+        serializer.save(updated_by=self.request.user)
+
     @action(detail=True, methods=['post'])
     def stage_transition(self, request, pk=None):
         """

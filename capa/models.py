@@ -452,7 +452,21 @@ class CAPA(AuditedModel):
         return f"{self.capa_id} - {self.title}"
 
     def save(self, *args, **kwargs):
-        """Override save to auto-compute RPN values and validate transitions."""
+        """Override save to auto-generate capa_id, compute RPN values."""
+        # Auto-generate capa_id if not set
+        if not self.capa_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            last = CAPA.objects.filter(capa_id__startswith=f'CAPA-{year}-').order_by('-capa_id').first()
+            if last and last.capa_id:
+                try:
+                    seq = int(last.capa_id.split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.capa_id = f'CAPA-{year}-{seq:04d}'
+
         # Auto-compute pre_action_rpn if not already set
         if self.pre_action_rpn is None:
             self.pre_action_rpn = self._calculate_rpn(

@@ -50,6 +50,23 @@ class AuditPlan(AuditedModel):
     def __str__(self):
         return f"{self.audit_id} - {self.get_audit_type_display()}"
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate audit_id."""
+        if not self.audit_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'AUD'
+            last = AuditPlan.objects.filter(audit_id__startswith=f'{prefix}-{year}-').order_by('-audit_id').first()
+            if last and getattr(last, 'audit_id'):
+                try:
+                    seq = int(getattr(last, 'audit_id').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.audit_id = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)
+
     def update_findings_count(self):
         """Update findings count from related findings"""
         self.findings_count = self.findings.count()
@@ -90,3 +107,20 @@ class AuditFinding(AuditedModel):
 
     def __str__(self):
         return f"{self.finding_id} - {self.get_category_display()}"
+
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate finding_id."""
+        if not self.finding_id:
+            from django.utils import timezone as tz
+            year = tz.now().year
+            prefix = 'FND'
+            last = AuditFinding.objects.filter(finding_id__startswith=f'{prefix}-{year}-').order_by('-finding_id').first()
+            if last and getattr(last, 'finding_id'):
+                try:
+                    seq = int(getattr(last, 'finding_id').split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+            self.finding_id = f'{prefix}-{year}-{seq:04d}'
+        super().save(*args, **kwargs)

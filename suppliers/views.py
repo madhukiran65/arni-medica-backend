@@ -36,6 +36,14 @@ class SupplierViewSet(viewsets.ModelViewSet):
             return SupplierCreateSerializer
         return SupplierDetailSerializer
 
+    def perform_create(self, serializer):
+        """Set created_by and updated_by to current user on creation."""
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        """Set updated_by to current user on update."""
+        serializer.save(updated_by=self.request.user)
+
     @action(detail=True, methods=['get', 'post'])
     def evaluations(self, request, pk=None):
         """

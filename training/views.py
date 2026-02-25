@@ -47,6 +47,8 @@ class TrainingCourseViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return TrainingCourseDetailSerializer
+        elif self.action == 'create':
+            return TrainingCourseDetailSerializer
         return TrainingCourseListSerializer
 
     def perform_create(self, serializer):
@@ -166,8 +168,8 @@ class TrainingAssignmentViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class TrainingAssessmentViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only ViewSet for training assessments"""
+class TrainingAssessmentViewSet(viewsets.ModelViewSet):
+    """ViewSet for training assessments with full CRUD"""
     queryset = TrainingAssessment.objects.all()
     serializer_class = TrainingAssessmentSerializer
     permission_classes = [IsAuthenticated]
@@ -175,6 +177,14 @@ class TrainingAssessmentViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['course']
     ordering_fields = ['created_at']
     ordering = ['-created_at']
+
+    def perform_create(self, serializer):
+        """Set created_by and updated_by to current user on creation."""
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        """Set updated_by to current user on update."""
+        serializer.save(updated_by=self.request.user)
 
 
 class ComplianceDashboardViewSet(viewsets.ViewSet):
