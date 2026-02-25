@@ -313,7 +313,7 @@ class CAPAApprovalSerializer(serializers.ModelSerializer):
 
 class ApprovalResponseSerializer(serializers.Serializer):
     """Serializer for approval responses."""
-    
+
     status = serializers.ChoiceField(
         choices=['approved', 'rejected', 'deferred'],
         required=True
@@ -323,11 +323,7 @@ class ApprovalResponseSerializer(serializers.Serializer):
         required=False,
         allow_blank=True
     )
-    password = serializers.CharField(
-        max_length=255,
-        required=True,
-        help_text="User password for electronic signature"
-    )
+    approval_id = serializers.IntegerField(required=True)
 
 
 # ============================================================================
@@ -443,8 +439,8 @@ class CAPACommentSerializer(serializers.ModelSerializer):
 
 class PhaseTransitionSerializer(serializers.Serializer):
     """Serializer for phase transitions."""
-    
-    target_phase = serializers.ChoiceField(
+
+    new_phase = serializers.ChoiceField(
         choices=[
             'investigation',
             'root_cause',
@@ -460,11 +456,6 @@ class PhaseTransitionSerializer(serializers.Serializer):
         max_length=1000,
         required=False,
         allow_blank=True
-    )
-    password = serializers.CharField(
-        max_length=255,
-        required=True,
-        help_text="User password for electronic signature"
     )
 
 

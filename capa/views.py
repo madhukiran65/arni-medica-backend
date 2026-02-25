@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -208,8 +208,8 @@ class CAPAViewSet(viewsets.ModelViewSet):
         return Response(stats)
 
 
-class CAPAApprovalViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only viewset for CAPA approvals with respond action."""
+class CAPAApprovalViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """ViewSet for CAPA approvals with create and read operations."""
     queryset = CAPAApproval.objects.select_related('capa', 'approver').all()
     serializer_class = CAPAApprovalSerializer
     permission_classes = [IsAuthenticated]
