@@ -347,3 +347,4 @@ sudo systemctl restart nginx
 - [ ] Keep dependencies updated
 
 For compliance documentation (ISO 13485, FDA 21 CFR Part 11, etc.), see COMPLIANCE.md
+# Deploy trigger Wed Feb 25 19:49:30 UTC 2026
