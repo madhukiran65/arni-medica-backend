@@ -888,12 +888,15 @@ class Document(AuditedModel):
         document_id = f"{prefix}-{year}-{next_num:04d}"
 
         # Ensure uniqueness
-        counter = 1
-        original_id = document_id
-        while Document.objects.filter(document_id=document_id).exclude(pk=self.pk).exists():
-            next_num += counter
+        qs = Document.objects.filter(document_id=document_id)
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        while qs.exists():
+            next_num += 1
             document_id = f"{prefix}-{year}-{next_num:04d}"
-            counter += 1
+            qs = Document.objects.filter(document_id=document_id)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
 
         return document_id
     
