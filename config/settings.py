@@ -118,13 +118,18 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS — Allow React frontend
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:5173,https://arni-medica-eqms-production.up.railway.app,https://arni-medica-frontend.vercel.app,https://arni-medica-frontend-madhukiran65s-projects.vercel.app',
-    cast=Csv()
-)
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=not DEBUG, cast=bool)
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Django REST Framework
 REST_FRAMEWORK = {
