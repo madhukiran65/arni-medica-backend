@@ -197,9 +197,12 @@ class ComplianceDashboardViewSet(viewsets.ViewSet):
         if total_assignments > 0:
             compliance_percentage = (completed_assignments / total_assignments) * 100
 
-        # Mandatory = courses linked to mandatory training plans
-        mandatory_plan_courses = TrainingPlan.objects.filter(is_mandatory=True).values_list('courses__course', flat=True)
-        mandatory_assignments = TrainingAssignment.objects.filter(course__in=mandatory_plan_courses)
+        # Mandatory = courses linked to mandatory training plans (via TrainingPlanCourse)
+        from .models import TrainingPlanCourse
+        mandatory_course_ids = TrainingPlanCourse.objects.filter(
+            training_plan__is_mandatory=True
+        ).values_list('course_id', flat=True)
+        mandatory_assignments = TrainingAssignment.objects.filter(course_id__in=mandatory_course_ids)
         mandatory_completed = mandatory_assignments.filter(status='completed').count()
 
         mandatory_compliance_percentage = 0
@@ -232,14 +235,16 @@ class ComplianceDashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def by_department(self, request):
         """Get compliance statistics by department"""
-        departments = TrainingAssignment.objects.values('user__department').annotate(
+        departments = TrainingAssignment.objects.values(
+            'user__profile__department__name'
+        ).annotate(
             total=Count('id'),
             completed=Count('id', filter=Q(status='completed')),
             overdue=Count('id', filter=Q(
-                Q(status__in=['assigned', 'in_progress']) & 
+                Q(status__in=['assigned', 'in_progress']) &
                 Q(due_date__lt=timezone.now().date())
             ))
-        ).order_by('user__department')
+        ).order_by('user__profile__department__name')
 
         data = []
         for dept in departments:
@@ -247,7 +252,7 @@ class ComplianceDashboardViewSet(viewsets.ViewSet):
             completed = dept['completed']
             compliance_pct = (completed / total * 100) if total > 0 else 0
             data.append({
-                'department': dept['user__department'],
+                'department': dept['user__profile__department__name'] or 'Unassigned',
                 'total': total,
                 'completed': completed,
                 'overdue': dept['overdue'],
@@ -291,8 +296,7 @@ class AutoAssignView(APIView):
                 assigned_count = 0
                 for course in courses:
                     users = User.objects.filter(
-                        department=department,
-                        job_function=job_function
+                        profile__department=department
                     ).exclude(
                         training_assignments__course=course
                     )
