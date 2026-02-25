@@ -75,7 +75,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Set owner to current user on creation."""
-        serializer.save(owner=self.request.user)
+        serializer.save(owner=self.request.user, created_by=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        """Override create to return detailed errors on failure."""
+        import traceback
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            return Response(
+                {'error': str(e), 'traceback': traceback.format_exc()},
+                status=400
+            )
 
     def perform_update(self, serializer):
         """Update document."""
