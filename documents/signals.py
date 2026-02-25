@@ -34,9 +34,8 @@ def create_initial_document_version(sender, instance, created, **kwargs):
     if created:
         DocumentVersion.objects.create(
             document=instance,
-            version_number=instance.version,
+            major_version=instance.major_version,
+            minor_version=instance.minor_version,
             created_by=instance.owner,
-            file=instance.file,
-            file_hash=instance.file_hash,
             change_summary='Initial version'
         )
