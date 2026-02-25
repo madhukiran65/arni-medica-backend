@@ -197,8 +197,9 @@ class ComplianceDashboardViewSet(viewsets.ViewSet):
         if total_assignments > 0:
             compliance_percentage = (completed_assignments / total_assignments) * 100
 
-        mandatory_courses = TrainingCourse.objects.filter(is_mandatory=True)
-        mandatory_assignments = TrainingAssignment.objects.filter(course__in=mandatory_courses)
+        # Mandatory = courses linked to mandatory training plans
+        mandatory_plan_courses = TrainingPlan.objects.filter(is_mandatory=True).values_list('courses__course', flat=True)
+        mandatory_assignments = TrainingAssignment.objects.filter(course__in=mandatory_plan_courses)
         mandatory_completed = mandatory_assignments.filter(status='completed').count()
 
         mandatory_compliance_percentage = 0
@@ -278,10 +279,9 @@ class AutoAssignView(APIView):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
-                # Get required courses for job function
+                # Get required courses for job function (via mandatory training plans)
                 courses = TrainingCourse.objects.filter(
-                    is_mandatory=True,
-                    job_functions=job_function
+                    applicable_job_functions=job_function
                 )
 
                 # Auto-assign courses to users in department with this job function
