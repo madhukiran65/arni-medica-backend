@@ -120,7 +120,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS — Allow React frontend
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:5173,https://arni-medica-eqms-production.up.railway.app',
+    default='http://localhost:3000,http://localhost:5173,https://arni-medica-eqms-production.up.railway.app,https://arni-medica-frontend.vercel.app,https://arni-medica-frontend-madhukiran65s-projects.vercel.app',
     cast=Csv()
 )
 CORS_ALLOW_CREDENTIALS = True
