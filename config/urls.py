@@ -13,13 +13,41 @@ def _db_check(request):
             result[table] = [r[0] for r in cursor.fetchall()]
         except Exception as e:
             result[table] = str(e)
-    # Check migration status
+    # Check ALL migration status
     try:
-        cursor.execute("SELECT app, name FROM django_migrations WHERE app = 'users' ORDER BY id")
-        result['migrations'] = [f"{r[0]}.{r[1]}" for r in cursor.fetchall()]
+        cursor.execute("SELECT app, name FROM django_migrations ORDER BY app, id")
+        result['all_migrations'] = [f"{r[0]}.{r[1]}" for r in cursor.fetchall()]
     except Exception as e:
-        result['migrations'] = str(e)
+        result['all_migrations'] = str(e)
+    # Show migration files on disk
+    import os
+    mig_files = {}
+    for app_dir in ['users', 'training', 'forms', 'documents', 'capa', 'complaints',
+                     'deviations', 'change_controls', 'suppliers', 'audit_mgmt', 'workflows']:
+        mig_path = os.path.join('/app', app_dir, 'migrations')
+        if os.path.isdir(mig_path):
+            mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
+    result['migration_files_on_disk'] = mig_files
+    # Build version
+    result['build_marker'] = 'v3-full-schema-upgrade'
     return JsonResponse(result)
+
+
+def _run_migrate(request):
+    """Manually run migrations and return output."""
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ['python', 'manage.py', 'migrate', '--noinput', '-v', '2'],
+            capture_output=True, text=True, timeout=120, cwd='/app'
+        )
+        return JsonResponse({
+            'returncode': proc.returncode,
+            'stdout': proc.stdout[-5000:] if proc.stdout else '',
+            'stderr': proc.stderr[-5000:] if proc.stderr else '',
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)})
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -49,6 +77,7 @@ urlpatterns = [
     path('api/health/', lambda r: __import__('django.http', fromlist=['JsonResponse']).JsonResponse({'status': 'ok'})),
     # DB diagnostic
     path('api/db-check/', lambda r: _db_check(r)),
+    path('api/run-migrate/', lambda r: _run_migrate(r)),
     # API docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
