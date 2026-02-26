@@ -248,6 +248,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'document_id',
+            'legacy_document_id',
             'title',
             'infocard_type',
             'infocard_type_name',
@@ -263,6 +264,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'document_id',
+            'legacy_document_id',
             'version_string',
             'infocard_type_name',
             'department_name',
@@ -319,6 +321,7 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'document_id',
+            'legacy_document_id',
             'title',
             'abbreviation',
             'infocard_type',
@@ -420,12 +423,13 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating new documents."""
-    
+
     class Meta:
         model = Document
         fields = [
             'title',
             'abbreviation',
+            'legacy_document_id',
             'infocard_type',
             'subtype',
             'department',

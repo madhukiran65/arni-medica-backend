@@ -109,7 +109,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DocumentFilterSet
-    search_fields = ['document_id', 'title', 'description', 'subject_keywords']
+    search_fields = ['document_id', 'legacy_document_id', 'title', 'description', 'subject_keywords']
     ordering_fields = ['created_at', 'document_id', 'title', 'next_review_date', 'vault_state']
     ordering = ['-created_at']
     parser_classes = (MultiPartParser, FormParser)
@@ -487,6 +487,107 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 {'error': f'File upload failed: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(detail=False, methods=['post'])
+    def bulk_import(self, request):
+        """
+        Bulk import documents with legacy ID mapping.
+
+        POST body (JSON): {
+            "documents": [
+                {
+                    "title": "SOP on SOP",
+                    "legacy_document_id": "QA001-03",
+                    "infocard_type_prefix": "SOP",
+                    "department_name": "Quality Assurance",
+                    "business_unit": "QA",
+                    "vault_state": "released",
+                    "major_version": 3,
+                    "minor_version": 0,
+                    "external_file_url": "https://...",
+                    "original_filename": "SOP on SOP.docx",
+                    "subject_keywords": ["sop", "quality"],
+                    "custom_fields": {"legacy_folder": "QA001-03"}
+                }
+            ]
+        }
+        """
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Only administrators can perform bulk import'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        documents_data = request.data.get('documents', [])
+        if not documents_data:
+            return Response(
+                {'error': 'documents list is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        results = {'created': 0, 'skipped': 0, 'errors': []}
+
+        for doc_data in documents_data:
+            try:
+                legacy_id = doc_data.get('legacy_document_id', '')
+
+                # Skip if legacy_document_id already exists
+                if legacy_id and Document.objects.filter(legacy_document_id=legacy_id).exists():
+                    results['skipped'] += 1
+                    continue
+
+                # Look up infocard type by prefix
+                prefix = doc_data.get('infocard_type_prefix', 'SOP')
+                infocard_type = DocumentInfocardType.objects.filter(prefix=prefix).first()
+                if not infocard_type:
+                    infocard_type = DocumentInfocardType.objects.first()
+
+                # Look up department if provided
+                from users.models import Department
+                department = None
+                dept_name = doc_data.get('department_name', '')
+                if dept_name:
+                    department = Department.objects.filter(name__icontains=dept_name).first()
+
+                # Parse version from legacy ID (e.g., QA001-03 → version 3)
+                major_version = doc_data.get('major_version', 1)
+                minor_version = doc_data.get('minor_version', 0)
+
+                document = Document(
+                    title=doc_data.get('title', 'Untitled'),
+                    legacy_document_id=legacy_id,
+                    infocard_type=infocard_type,
+                    department=department,
+                    owner=request.user,
+                    created_by=request.user,
+                    business_unit=doc_data.get('business_unit', ''),
+                    vault_state=doc_data.get('vault_state', 'released'),
+                    major_version=major_version,
+                    minor_version=minor_version,
+                    external_file_url=doc_data.get('external_file_url', ''),
+                    original_filename=doc_data.get('original_filename', ''),
+                    subject_keywords=doc_data.get('subject_keywords', []),
+                    custom_fields=doc_data.get('custom_fields', {}),
+                    requires_training=doc_data.get('requires_training', False),
+                    distribution_restriction=doc_data.get('distribution_restriction', 'internal'),
+                    confidentiality_level=doc_data.get('confidentiality_level', 'internal'),
+                )
+                document.save()
+                results['created'] += 1
+
+            except Exception as e:
+                results['errors'].append({
+                    'legacy_id': doc_data.get('legacy_document_id', 'unknown'),
+                    'error': str(e)
+                })
+
+        return Response({
+            'success': True,
+            'created': results['created'],
+            'skipped': results['skipped'],
+            'errors': results['errors'],
+            'total_requested': len(documents_data),
+        }, status=status.HTTP_201_CREATED)
 
     def _calculate_file_hash(self, file_obj):
         """Calculate SHA-256 hash of a file object."""

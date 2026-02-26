@@ -578,7 +578,13 @@ class Document(AuditedModel):
     document_id = models.CharField(
         max_length=50,
         unique=True,
-        help_text="Auto-generated unique document identifier (e.g., 'SOP-001')"
+        help_text="Auto-generated unique document identifier (e.g., 'SOP-2026-0001')"
+    )
+    legacy_document_id = models.CharField(
+        max_length=100,
+        blank=True,
+        db_index=True,
+        help_text="Legacy document ID from paper-based QMS (e.g., 'QA001-03')"
     )
     title = models.CharField(
         max_length=500,
@@ -861,16 +867,28 @@ class Document(AuditedModel):
     
     def auto_generate_document_id(self):
         """
-        Generate unique document ID using DOC prefix with year and sequence number.
+        Generate unique document ID using infocard type prefix with year and sequence.
+
+        Uses the document's infocard_type prefix (e.g., SOP, FRM, WIS) to create
+        IDs like 'SOP-2026-0001', 'FRM-2026-0012', etc.
+        Falls back to 'DOC' if no infocard_type is set.
 
         Returns:
-            str: Generated document ID like 'DOC-2025-0001', 'DOC-2025-0042', etc.
+            str: Generated document ID like 'SOP-2026-0001'
         """
         from django.utils import timezone as tz
         year = tz.now().year
-        prefix = 'DOC'
 
-        # Get the next sequence number for this year
+        # Use infocard type prefix if available, otherwise fallback to DOC
+        if self.infocard_type_id:
+            try:
+                prefix = self.infocard_type.prefix
+            except DocumentInfocardType.DoesNotExist:
+                prefix = 'DOC'
+        else:
+            prefix = 'DOC'
+
+        # Get the next sequence number for this prefix+year
         last_doc = Document.objects.filter(
             document_id__startswith=f'{prefix}-{year}-'
         ).order_by('-document_id').first()
