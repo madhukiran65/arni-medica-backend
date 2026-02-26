@@ -7,4 +7,5 @@ class WorkflowsConfig(AppConfig):
     verbose_name = 'Workflow Engine'
 
     def ready(self):
-        import workflows.signals  # noqa: F401
+        from workflows.signals import connect_workflow_signals
+        connect_workflow_signals()

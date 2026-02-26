@@ -77,6 +77,71 @@ class WorkflowRecordViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(is_overdue=True)
         return qs
 
+    @action(detail=False, methods=['get'], url_path='by-record')
+    def by_record(self, request):
+        """
+        Look up workflow record by model_type and object_id.
+        Usage: GET /api/workflows/records/by-record/?model_type=document&object_id=123
+        Returns full workflow state with stages, transitions, and approval status.
+        """
+        model_type = request.query_params.get('model_type')
+        object_id = request.query_params.get('object_id')
+        if not model_type or not object_id:
+            return Response(
+                {'error': 'model_type and object_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            wr = WorkflowRecord.objects.select_related(
+                'current_stage', 'workflow'
+            ).get(
+                workflow__model_type=model_type,
+                object_id=object_id,
+                is_active=True,
+            )
+        except WorkflowRecord.DoesNotExist:
+            return Response(
+                {'error': 'No workflow record found', 'has_workflow': False},
+                status=status.HTTP_200_OK
+            )
+
+        # Build comprehensive response
+        all_stages = list(wr.workflow.stages.order_by('sequence').values(
+            'id', 'name', 'slug', 'sequence', 'color', 'icon',
+            'requires_approval', 'requires_signature', 'is_initial',
+            'is_terminal', 'allows_edit', 'sla_days',
+        ))
+        transitions = WorkflowService.get_valid_transitions(wr)
+        approval_status = WorkflowService.get_approval_status(wr)
+        history = wr.history.order_by('-transitioned_at').values(
+            'from_stage__name', 'to_stage__name', 'transitioned_by__username',
+            'transitioned_at', 'comments', 'time_in_stage_seconds',
+        )[:20]
+
+        return Response({
+            'has_workflow': True,
+            'workflow_record_id': wr.id,
+            'workflow_name': wr.workflow.name,
+            'model_type': wr.workflow.model_type,
+            'current_stage': {
+                'id': wr.current_stage.id,
+                'name': wr.current_stage.name,
+                'slug': wr.current_stage.slug,
+                'sequence': wr.current_stage.sequence,
+                'color': wr.current_stage.color,
+                'allows_edit': wr.current_stage.allows_edit,
+                'requires_approval': wr.current_stage.requires_approval,
+                'requires_signature': wr.current_stage.requires_signature,
+            },
+            'all_stages': all_stages,
+            'valid_transitions': transitions,
+            'approval_status': approval_status,
+            'entered_stage_at': wr.entered_stage_at,
+            'estimated_exit_date': wr.estimated_exit_date,
+            'is_overdue': wr.is_overdue,
+            'history': list(history),
+        })
+
     @action(detail=True, methods=['post'], url_path='transition')
     def do_transition(self, request, pk=None):
         """
