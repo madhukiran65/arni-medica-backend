@@ -12,7 +12,7 @@ from .views import (
 )
 
 router = DefaultRouter()
-router.register(r'design-projects', DesignProjectViewSet, basename='design-project')
+router.register(r'projects', DesignProjectViewSet, basename='design-project')
 router.register(r'user-needs', UserNeedViewSet, basename='user-need')
 router.register(r'design-inputs', DesignInputViewSet, basename='design-input')
 router.register(r'design-outputs', DesignOutputViewSet, basename='design-output')

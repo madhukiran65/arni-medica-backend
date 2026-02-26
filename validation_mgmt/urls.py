@@ -7,7 +7,7 @@ router = DefaultRouter()
 
 # Register viewsets
 router.register(
-    r'validation-plans',
+    r'plans',
     views.ValidationPlanViewSet,
     basename='validation-plan'
 )
