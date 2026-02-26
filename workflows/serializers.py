@@ -55,10 +55,11 @@ class WorkflowDefinitionSerializer(serializers.ModelSerializer):
 class WorkflowDefinitionListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list views."""
     stage_count = serializers.SerializerMethodField()
+    stages = WorkflowStageSerializer(many=True, read_only=True)
 
     class Meta:
         model = WorkflowDefinition
-        fields = ['id', 'name', 'description', 'model_type', 'is_active', 'stage_count']
+        fields = ['id', 'name', 'description', 'model_type', 'is_active', 'stage_count', 'stages']
 
     def get_stage_count(self, obj):
         return obj.stages.count()
