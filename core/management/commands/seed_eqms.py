@@ -394,7 +394,6 @@ class Command(BaseCommand):
                 "created_by": admin,
                 "updated_by": admin,
                 "owner": admin,
-                "description": f"Demo document: {doc_spec['title']}",
                 "effective_date": effective_date,
                 "next_review_date": next_review_date,
                 "confidentiality_level": "internal",
