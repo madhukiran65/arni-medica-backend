@@ -297,11 +297,10 @@ class Command(BaseCommand):
         admin_role = Role.objects.filter(name="Administrator").first()
         qa_director_jf = JobFunction.objects.filter(code="QAD").first()
 
-        profile, _ = UserProfile.objects.get_or_create(
+        profile, _ = UserProfile.objects.update_or_create(
             user=admin,
-            defaults={"employee_id": f"EMP-{admin.pk:04d}"}
+            defaults={"employee_id": "EMP-0001"}
         )
-        profile.employee_id = "EMP-0001"
         profile.department = qa_dept
         profile.site = hyd_site
         profile.title = "Quality Assurance Director"
@@ -601,21 +600,22 @@ class Command(BaseCommand):
                 created += 1
 
             # Create or update UserProfile
-            profile, _ = UserProfile.objects.get_or_create(
-                user=user,
-                defaults={"employee_id": user_data["employee_id"]}
-            )
-            profile.employee_id = user_data["employee_id"]
-            profile.department = user_data["department"]
-            profile.site = user_data["site"]
-            profile.title = user_data["title"]
-            profile.phone = user_data["phone"]
-            profile.date_of_joining = user_data["date_of_joining"]
+            defaults = {
+                "employee_id": user_data["employee_id"],
+                "department": user_data["department"],
+                "site": user_data["site"],
+                "title": user_data["title"],
+                "phone": user_data["phone"],
+                "date_of_joining": user_data["date_of_joining"],
+            }
             if job_function:
-                profile.job_function = job_function
+                defaults["job_function"] = job_function
             if supervisor:
-                profile.supervisor = supervisor
-            profile.save()
+                defaults["supervisor"] = supervisor
+            profile, _ = UserProfile.objects.update_or_create(
+                user=user,
+                defaults=defaults
+            )
 
             # Assign roles via M2M on UserProfile (not user.groups)
             profile.roles.clear()
