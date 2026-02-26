@@ -114,6 +114,17 @@ def forwards(apps, schema_editor):
             )
         """)
 
+    # ── Fake-record migration 0003 since we already applied the schema ──
+    cursor.execute(
+        "SELECT 1 FROM django_migrations WHERE app='users' AND name=%s",
+        ['0003_productline_site_department_code_department_head_and_more']
+    )
+    if not cursor.fetchone():
+        cursor.execute(
+            "INSERT INTO django_migrations (app, name, applied) VALUES ('users', %s, NOW())",
+            ['0003_productline_site_department_code_department_head_and_more']
+        )
+
 
 class Migration(migrations.Migration):
 

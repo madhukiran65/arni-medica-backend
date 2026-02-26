@@ -227,12 +227,12 @@ class EnhancedDashboardView(views.APIView):
         ).count()
 
         overdue_capas = CAPA.objects.filter(
-            status__in=['open', 'in_progress'],
-            target_closure_date__lt=now
+            current_phase__in=['investigation', 'root_cause', 'risk_affirmation', 'capa_plan'],
+            target_completion_date__lt=now
         ).count()
 
         overdue_deviations = Deviation.objects.filter(
-            status__in=['open', 'investigating'],
+            current_stage__in=['opened', 'qa_review', 'investigation', 'capa_plan'],
             target_closure_date__lt=now
         ).count()
 
@@ -253,8 +253,8 @@ class EnhancedDashboardView(views.APIView):
 
         # Count pending actions
         pending_actions = (
-            CAPA.objects.filter(status='open').count() +
-            Deviation.objects.filter(status='open').count() +
+            CAPA.objects.filter(current_phase__in=['investigation', 'root_cause']).count() +
+            Deviation.objects.filter(current_stage__in=['opened', 'qa_review']).count() +
             ChangeControl.objects.filter(current_stage__in=['submitted', 'screening']).count()
         )
 
@@ -402,8 +402,8 @@ class AIRecommendationsView(views.APIView):
 
         # Check for overdue CAPAs
         overdue_capas = CAPA.objects.filter(
-            status__in=['open', 'in_progress'],
-            target_closure_date__lt=now
+            current_phase__in=['investigation', 'root_cause', 'risk_affirmation', 'capa_plan'],
+            target_completion_date__lt=now
         ).count()
         if overdue_capas > 0:
             recommendations.append({
@@ -417,7 +417,7 @@ class AIRecommendationsView(views.APIView):
 
         # Check for open deviations
         open_deviations = Deviation.objects.filter(
-            status__in=['open', 'investigating']
+            current_stage__in=['opened', 'qa_review', 'investigation']
         ).count()
         if open_deviations > 3:
             recommendations.append({
