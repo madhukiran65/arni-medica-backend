@@ -124,6 +124,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return DocumentCreateSerializer
         return DocumentDetailSerializer
 
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve with error debugging."""
+        import traceback
+        try:
+            return super().retrieve(request, *args, **kwargs)
+        except Exception as e:
+            return Response(
+                {'error': str(e), 'traceback': traceback.format_exc()},
+                status=500
+            )
+
     def perform_create(self, serializer):
         """Set owner to current user on creation."""
         serializer.save(owner=self.request.user, created_by=self.request.user)
