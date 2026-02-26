@@ -182,6 +182,12 @@ class WorkflowRecordViewSet(viewsets.ReadOnlyModelViewSet):
         except WorkflowError as e:
             return Response({'error': str(e), 'code': 'workflow_error'},
                             status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            import traceback
+            return Response(
+                {'error': str(e), 'code': 'unexpected_error', 'traceback': traceback.format_exc()},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['get'], url_path='valid-next-states')
     def valid_next_states(self, request, pk=None):
