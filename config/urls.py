@@ -29,7 +29,7 @@ def _db_check(request):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v4-dashboard-fix'
+    result['build_marker'] = 'v5-fake-migrate'
     return JsonResponse(result)
 
 
@@ -51,14 +51,21 @@ def _run_seed(request):
 
 
 def _run_migrate(request):
-    """Manually run migrations and return output."""
+    """Manually run migrations and return output. ?fake=1 to fake-apply."""
     import subprocess
+    cmd = ['python', 'manage.py', 'migrate', '--noinput', '-v', '2']
+    if request.GET.get('fake'):
+        cmd = ['python', 'manage.py', 'migrate', '--fake', '--noinput', '-v', '2']
+    if request.GET.get('app'):
+        cmd.append(request.GET['app'])
+    if request.GET.get('name'):
+        cmd.append(request.GET['name'])
     try:
         proc = subprocess.run(
-            ['python', 'manage.py', 'migrate', '--noinput', '-v', '2'],
-            capture_output=True, text=True, timeout=120, cwd='/app'
+            cmd, capture_output=True, text=True, timeout=120, cwd='/app'
         )
         return JsonResponse({
+            'cmd': ' '.join(cmd),
             'returncode': proc.returncode,
             'stdout': proc.stdout[-5000:] if proc.stdout else '',
             'stderr': proc.stderr[-5000:] if proc.stderr else '',
