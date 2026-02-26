@@ -1,18 +1,18 @@
 """
 Unified seed command for Arni Medica AI-EQMS.
 Seeds: Workflows (with transitions + approval gates), InfoCard Types,
-Job Functions, Departments, Roles, Demo Data, and supporting entities.
+Job Functions, Departments, Roles, Sites, Product Lines, Users, Demo Data, and supporting entities.
 
 Based on MasterControl reference architecture + Dot Compliance UI patterns.
 """
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.utils import timezone
 
 from documents.models import DocumentInfocardType, Document
 from training.models import JobFunction
-from users.models import Department, Role, UserProfile
+from users.models import Department, Role, UserProfile, Site, ProductLine
 from workflows.seed_data import seed_all_workflows
 
 
@@ -42,15 +42,23 @@ class Command(BaseCommand):
         dept_count = self._seed_departments()
         self.stdout.write(self.style.SUCCESS(f"  Departments: {dept_count} created"))
 
-        # 2. Roles
+        # 2. Roles (with granular permissions)
         role_count = self._seed_roles()
         self.stdout.write(self.style.SUCCESS(f"  Roles: {role_count} created"))
 
-        # 3. InfoCard Types (MasterControl-style)
+        # 3. Sites
+        site_count = self._seed_sites()
+        self.stdout.write(self.style.SUCCESS(f"  Sites: {site_count} created"))
+
+        # 4. Product Lines
+        product_count = self._seed_product_lines()
+        self.stdout.write(self.style.SUCCESS(f"  Product Lines: {product_count} created"))
+
+        # 5. InfoCard Types (MasterControl-style)
         type_count = self._seed_infocard_types()
         self.stdout.write(self.style.SUCCESS(f"  InfoCard Types: {type_count} created"))
 
-        # 4. Workflows (comprehensive — from workflows/seed_data.py)
+        # 6. Workflows (comprehensive — from workflows/seed_data.py)
         from workflows.models import WorkflowDefinition
         if options['reset_workflows']:
             deleted = WorkflowDefinition.objects.all().delete()
@@ -70,15 +78,23 @@ class Command(BaseCommand):
         seed_all_workflows()
         self.stdout.write(self.style.SUCCESS(f"  Workflows: Seeded (5 definitions)"))
 
-        # 5. Job Functions
+        # 7. Job Functions
         jf_count = self._seed_job_functions()
         self.stdout.write(self.style.SUCCESS(f"  Job Functions: {jf_count} created"))
 
-        # 6. User Profiles for existing users
+        # 8. Admin user profile setup
+        self._setup_admin_user()
+        self.stdout.write(self.style.SUCCESS(f"  Admin User: Profile configured"))
+
+        # 9. Create additional users
+        user_count = self._seed_users()
+        self.stdout.write(self.style.SUCCESS(f"  Users: {user_count} created"))
+
+        # 10. User Profiles for remaining users
         profile_count = self._ensure_user_profiles()
         self.stdout.write(self.style.SUCCESS(f"  User Profiles: {profile_count} ensured"))
 
-        # 7. Demo data
+        # 11. Demo data
         if options['demo']:
             if options['reset_demo']:
                 self._reset_demo_data()
@@ -117,6 +133,8 @@ class Command(BaseCommand):
                 "can_close_capa": True, "can_create_complaints": True,
                 "can_log_training": True, "can_create_audit": True,
                 "can_view_audit_trail": True, "can_manage_users": True,
+                "can_manage_settings": True, "can_create_deviations": True,
+                "can_create_courses": True, "can_assign_training": True,
             },
             {
                 "name": "QA Manager",
@@ -125,6 +143,8 @@ class Command(BaseCommand):
                 "can_close_capa": True, "can_create_complaints": True,
                 "can_log_training": True, "can_create_audit": True,
                 "can_view_audit_trail": True, "can_manage_users": False,
+                "can_manage_settings": False, "can_create_deviations": True,
+                "can_create_courses": True, "can_assign_training": True,
             },
             {
                 "name": "Document Controller",
@@ -133,6 +153,8 @@ class Command(BaseCommand):
                 "can_close_capa": False, "can_create_complaints": False,
                 "can_log_training": False, "can_create_audit": False,
                 "can_view_audit_trail": True, "can_manage_users": False,
+                "can_manage_settings": False, "can_create_deviations": False,
+                "can_create_courses": False, "can_assign_training": False,
             },
             {
                 "name": "Quality Engineer",
@@ -141,6 +163,8 @@ class Command(BaseCommand):
                 "can_close_capa": False, "can_create_complaints": True,
                 "can_log_training": True, "can_create_audit": False,
                 "can_view_audit_trail": True, "can_manage_users": False,
+                "can_manage_settings": False, "can_create_deviations": True,
+                "can_create_courses": False, "can_assign_training": False,
             },
             {
                 "name": "Training Coordinator",
@@ -149,6 +173,8 @@ class Command(BaseCommand):
                 "can_close_capa": False, "can_create_complaints": False,
                 "can_log_training": True, "can_create_audit": False,
                 "can_view_audit_trail": False, "can_manage_users": False,
+                "can_manage_settings": False, "can_create_deviations": False,
+                "can_create_courses": True, "can_assign_training": True,
             },
             {
                 "name": "Viewer",
@@ -156,16 +182,447 @@ class Command(BaseCommand):
                 "can_sign_documents": False, "can_create_capa": False,
                 "can_close_capa": False, "can_create_complaints": False,
                 "can_log_training": False, "can_create_audit": False,
-                "can_view_audit_trail": False, "can_manage_users": False,
+                "can_view_audit_trail": True, "can_manage_users": False,
+                "can_manage_settings": False, "can_create_deviations": False,
+                "can_create_courses": False, "can_assign_training": False,
             },
         ]
         for role_data in roles:
             name = role_data.pop("name")
-            _, is_new = Role.objects.get_or_create(
+            role, is_new = Role.objects.get_or_create(
                 name=name, defaults=role_data
             )
             if is_new:
                 created += 1
+            else:
+                # Update existing roles with new permissions
+                for key, value in role_data.items():
+                    setattr(role, key, value)
+                role.save()
+        return created
+
+    def _seed_sites(self):
+        """Seed Arni Medica Diagnostics sites."""
+        created = 0
+        sites = [
+            {
+                "name": "Hyderabad HQ",
+                "code": "HYD",
+                "address": "Survey No. 42, Genome Valley, Shamirpet",
+                "city": "Hyderabad",
+                "state": "Telangana",
+                "country": "India",
+            },
+            {
+                "name": "Bengaluru R&D Center",
+                "code": "BLR",
+                "address": "IT Park, Whitefield",
+                "city": "Bengaluru",
+                "state": "Karnataka",
+                "country": "India",
+            },
+            {
+                "name": "Mumbai Manufacturing",
+                "code": "MUM",
+                "address": "MIDC Industrial Area, Andheri East",
+                "city": "Mumbai",
+                "state": "Maharashtra",
+                "country": "India",
+            },
+            {
+                "name": "US Operations",
+                "code": "US",
+                "address": "100 Diagnostics Way, Suite 300",
+                "city": "San Diego",
+                "state": "California",
+                "country": "United States",
+            },
+        ]
+        for site_data in sites:
+            _, is_new = Site.objects.get_or_create(
+                code=site_data["code"],
+                defaults=site_data
+            )
+            if is_new:
+                created += 1
+        return created
+
+    def _seed_product_lines(self):
+        """Seed Arni Medica product lines."""
+        created = 0
+        products = [
+            {
+                "name": "Glucose Analyzers",
+                "code": "GA",
+                "description": "Point-of-care glucose monitoring systems",
+            },
+            {
+                "name": "Rapid Test Kits",
+                "code": "RTK",
+                "description": "Lateral flow immunoassay test kits",
+            },
+            {
+                "name": "Quality Control Reagents",
+                "code": "QCR",
+                "description": "QC reagents for laboratory instruments",
+            },
+            {
+                "name": "Hematology Instruments",
+                "code": "HEM",
+                "description": "Complete blood count analyzers",
+            },
+            {
+                "name": "Clinical Chemistry",
+                "code": "CCH",
+                "description": "Automated clinical chemistry analyzers",
+            },
+        ]
+        for product_data in products:
+            _, is_new = ProductLine.objects.get_or_create(
+                code=product_data["code"],
+                defaults=product_data
+            )
+            if is_new:
+                created += 1
+        return created
+
+    def _setup_admin_user(self):
+        """Configure the existing admin user with profile, department, site, roles."""
+        admin = User.objects.filter(is_superuser=True).first()
+        if not admin:
+            return
+
+        qa_dept = Department.objects.filter(name="Quality Assurance").first()
+        hyd_site = Site.objects.filter(code="HYD").first()
+        admin_role = Role.objects.filter(name="Administrator").first()
+        qa_director_jf = JobFunction.objects.filter(code="QAD").first()
+
+        profile, _ = UserProfile.objects.get_or_create(
+            user=admin,
+            defaults={"employee_id": f"EMP-{admin.pk:04d}"}
+        )
+        profile.employee_id = "EMP-0001"
+        profile.department = qa_dept
+        profile.site = hyd_site
+        profile.title = "Quality Assurance Director"
+        profile.phone = "+91-40-XXXX-XXXX"
+        profile.date_of_joining = datetime(2020, 1, 15).date()
+        if qa_director_jf:
+            profile.job_function = qa_director_jf
+        profile.save()
+
+        # Add Administrator role via M2M on UserProfile
+        if admin_role:
+            profile.roles.add(admin_role)
+
+    def _seed_users(self):
+        """Create 15 additional users with profiles, departments, sites, and roles."""
+        created = 0
+        admin = User.objects.filter(is_superuser=True).first()
+
+        # Fetch departments, sites, roles, and job functions
+        qa_dept = Department.objects.filter(name="Quality Assurance").first()
+        qc_dept = Department.objects.filter(name="Quality Control").first()
+        reg_dept = Department.objects.filter(name="Regulatory Affairs").first()
+        mfg_dept = Department.objects.filter(name="Manufacturing").first()
+        rd_dept = Department.objects.filter(name="Research & Development").first()
+        hr_dept = Department.objects.filter(name="Human Resources").first()
+        it_dept = Department.objects.filter(name="IT").first()
+        clinical_dept = Department.objects.filter(name="Clinical Affairs").first()
+        supply_dept = Department.objects.filter(name="Supply Chain").first()
+
+        hyd_site = Site.objects.filter(code="HYD").first()
+        blr_site = Site.objects.filter(code="BLR").first()
+        mum_site = Site.objects.filter(code="MUM").first()
+        us_site = Site.objects.filter(code="US").first()
+
+        admin_role = Role.objects.filter(name="Administrator").first()
+        qa_mgr_role = Role.objects.filter(name="QA Manager").first()
+        doc_ctrl_role = Role.objects.filter(name="Document Controller").first()
+        qual_eng_role = Role.objects.filter(name="Quality Engineer").first()
+        train_coord_role = Role.objects.filter(name="Training Coordinator").first()
+
+        qm_jf = JobFunction.objects.filter(code="QM").first()
+        qe_jf = JobFunction.objects.filter(code="QE").first()
+        dc_jf = JobFunction.objects.filter(code="DC").first()
+        ra_jf = JobFunction.objects.filter(code="RA").first()
+        qad_jf = JobFunction.objects.filter(code="QAD").first()
+        ia_jf = JobFunction.objects.filter(code="IA").first()
+        tc_jf = JobFunction.objects.filter(code="TC").first()
+        mfg_jf = JobFunction.objects.filter(code="MFG").first()
+
+        users_data = [
+            {
+                "username": "priya.sharma",
+                "email": "priya.sharma@arnimedica.com",
+                "first_name": "Priya",
+                "last_name": "Sharma",
+                "employee_id": "EMP-0002",
+                "title": "QA Director",
+                "phone": "+91-40-1234-5001",
+                "department": qa_dept,
+                "site": hyd_site,
+                "roles": [admin_role, qa_mgr_role],
+                "job_function": qad_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2019, 6, 1).date(),
+            },
+            {
+                "username": "rajesh.kumar",
+                "email": "rajesh.kumar@arnimedica.com",
+                "first_name": "Rajesh",
+                "last_name": "Kumar",
+                "employee_id": "EMP-0003",
+                "title": "QA Manager",
+                "phone": "+91-40-1234-5002",
+                "department": qa_dept,
+                "site": hyd_site,
+                "roles": [qa_mgr_role],
+                "job_function": qm_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2020, 3, 15).date(),
+            },
+            {
+                "username": "anita.reddy",
+                "email": "anita.reddy@arnimedica.com",
+                "first_name": "Anita",
+                "last_name": "Reddy",
+                "employee_id": "EMP-0004",
+                "title": "Document Controller",
+                "phone": "+91-40-1234-5003",
+                "department": qa_dept,
+                "site": hyd_site,
+                "roles": [doc_ctrl_role],
+                "job_function": dc_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2021, 1, 10).date(),
+            },
+            {
+                "username": "venkat.rao",
+                "email": "venkat.rao@arnimedica.com",
+                "first_name": "Venkat",
+                "last_name": "Rao",
+                "employee_id": "EMP-0005",
+                "title": "Quality Engineer",
+                "phone": "+91-22-1234-5004",
+                "department": qc_dept,
+                "site": mum_site,
+                "roles": [qual_eng_role],
+                "job_function": qe_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2021, 7, 20).date(),
+            },
+            {
+                "username": "deepika.nair",
+                "email": "deepika.nair@arnimedica.com",
+                "first_name": "Deepika",
+                "last_name": "Nair",
+                "employee_id": "EMP-0006",
+                "title": "Regulatory Affairs Manager",
+                "phone": "+1-619-1234-5005",
+                "department": reg_dept,
+                "site": us_site,
+                "roles": [qa_mgr_role],
+                "job_function": ra_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2019, 9, 5).date(),
+            },
+            {
+                "username": "suresh.patel",
+                "email": "suresh.patel@arnimedica.com",
+                "first_name": "Suresh",
+                "last_name": "Patel",
+                "employee_id": "EMP-0007",
+                "title": "Manufacturing Head",
+                "phone": "+91-22-1234-5006",
+                "department": mfg_dept,
+                "site": mum_site,
+                "roles": [qa_mgr_role],
+                "job_function": mfg_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2018, 5, 12).date(),
+            },
+            {
+                "username": "kavitha.menon",
+                "email": "kavitha.menon@arnimedica.com",
+                "first_name": "Kavitha",
+                "last_name": "Menon",
+                "employee_id": "EMP-0008",
+                "title": "R&D Director",
+                "phone": "+91-80-1234-5007",
+                "department": rd_dept,
+                "site": blr_site,
+                "roles": [admin_role],
+                "job_function": qad_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2017, 8, 22).date(),
+            },
+            {
+                "username": "arun.joshi",
+                "email": "arun.joshi@arnimedica.com",
+                "first_name": "Arun",
+                "last_name": "Joshi",
+                "employee_id": "EMP-0009",
+                "title": "Training Coordinator",
+                "phone": "+91-40-1234-5008",
+                "department": hr_dept,
+                "site": hyd_site,
+                "roles": [train_coord_role],
+                "job_function": tc_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2021, 11, 1).date(),
+            },
+            {
+                "username": "meena.gupta",
+                "email": "meena.gupta@arnimedica.com",
+                "first_name": "Meena",
+                "last_name": "Gupta",
+                "employee_id": "EMP-0010",
+                "title": "QC Lab Supervisor",
+                "phone": "+91-22-1234-5009",
+                "department": qc_dept,
+                "site": mum_site,
+                "roles": [qual_eng_role],
+                "job_function": qe_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2020, 4, 18).date(),
+            },
+            {
+                "username": "sanjay.desai",
+                "email": "sanjay.desai@arnimedica.com",
+                "first_name": "Sanjay",
+                "last_name": "Desai",
+                "employee_id": "EMP-0011",
+                "title": "IT Manager",
+                "phone": "+91-40-1234-5010",
+                "department": it_dept,
+                "site": hyd_site,
+                "roles": [admin_role],
+                "job_function": qm_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2019, 2, 10).date(),
+            },
+            {
+                "username": "lakshmi.iyer",
+                "email": "lakshmi.iyer@arnimedica.com",
+                "first_name": "Lakshmi",
+                "last_name": "Iyer",
+                "employee_id": "EMP-0012",
+                "title": "Clinical Affairs Lead",
+                "phone": "+1-619-1234-5011",
+                "department": clinical_dept,
+                "site": us_site,
+                "roles": [qual_eng_role],
+                "job_function": qe_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2020, 8, 3).date(),
+            },
+            {
+                "username": "ravi.krishnan",
+                "email": "ravi.krishnan@arnimedica.com",
+                "first_name": "Ravi",
+                "last_name": "Krishnan",
+                "employee_id": "EMP-0013",
+                "title": "Supply Chain Manager",
+                "phone": "+91-22-1234-5012",
+                "department": supply_dept,
+                "site": mum_site,
+                "roles": [qa_mgr_role],
+                "job_function": qm_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2019, 10, 28).date(),
+            },
+            {
+                "username": "pooja.verma",
+                "email": "pooja.verma@arnimedica.com",
+                "first_name": "Pooja",
+                "last_name": "Verma",
+                "employee_id": "EMP-0014",
+                "title": "Quality Engineer",
+                "phone": "+91-80-1234-5013",
+                "department": qa_dept,
+                "site": blr_site,
+                "roles": [qual_eng_role],
+                "job_function": qe_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2021, 5, 24).date(),
+            },
+            {
+                "username": "amit.singh",
+                "email": "amit.singh@arnimedica.com",
+                "first_name": "Amit",
+                "last_name": "Singh",
+                "employee_id": "EMP-0015",
+                "title": "Internal Auditor",
+                "phone": "+91-40-1234-5014",
+                "department": qa_dept,
+                "site": hyd_site,
+                "roles": [qa_mgr_role],
+                "job_function": ia_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2020, 12, 7).date(),
+            },
+            {
+                "username": "sneha.bhat",
+                "email": "sneha.bhat@arnimedica.com",
+                "first_name": "Sneha",
+                "last_name": "Bhat",
+                "employee_id": "EMP-0016",
+                "title": "Regulatory Specialist",
+                "phone": "+91-40-1234-5015",
+                "department": reg_dept,
+                "site": hyd_site,
+                "roles": [qual_eng_role],
+                "job_function": qe_jf,
+                "supervisor": admin,
+                "date_of_joining": datetime(2021, 3, 15).date(),
+            },
+        ]
+
+        for user_data in users_data:
+            roles_list = user_data.pop("roles")
+            job_function = user_data.pop("job_function")
+            supervisor = user_data.pop("supervisor")
+            email = user_data["email"]
+            password = email.split("@")[0] + "123"  # Default password
+
+            user, is_new = User.objects.get_or_create(
+                username=user_data["username"],
+                defaults={
+                    "email": email,
+                    "first_name": user_data["first_name"],
+                    "last_name": user_data["last_name"],
+                }
+            )
+
+            if is_new:
+                user.set_password(password)
+                user.save()
+                created += 1
+
+            # Create or update UserProfile
+            profile, _ = UserProfile.objects.get_or_create(
+                user=user,
+                defaults={"employee_id": user_data["employee_id"]}
+            )
+            profile.employee_id = user_data["employee_id"]
+            profile.department = user_data["department"]
+            profile.site = user_data["site"]
+            profile.title = user_data["title"]
+            profile.phone = user_data["phone"]
+            profile.date_of_joining = user_data["date_of_joining"]
+            if job_function:
+                profile.job_function = job_function
+            if supervisor:
+                profile.supervisor = supervisor
+            profile.save()
+
+            # Assign roles via M2M on UserProfile (not user.groups)
+            profile.roles.clear()
+            for role in roles_list:
+                if role:
+                    profile.roles.add(role)
+
         return created
 
     def _seed_infocard_types(self):
