@@ -733,7 +733,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         serializer = DocumentSnapshotSerializer(snapshots, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get', 'post'])
+    @action(detail=True, methods=['get', 'post'], parser_classes=[JSONParser, MultiPartParser, FormParser])
     def approvers(self, request, pk=None):
         """List or add approvers for a document."""
         document = self.get_object()
