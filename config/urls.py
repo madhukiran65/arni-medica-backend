@@ -29,7 +29,7 @@ def _db_check(request):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v14-suggestions-fix'
+    result['build_marker'] = 'v15-export-pdf-docx'
     return JsonResponse(result)
 
 
