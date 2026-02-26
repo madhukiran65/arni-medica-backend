@@ -38,7 +38,7 @@ class WorkflowTransitionSerializer(serializers.ModelSerializer):
 class WorkflowDefinitionSerializer(serializers.ModelSerializer):
     stages = WorkflowStageSerializer(many=True, read_only=True)
     transitions = WorkflowTransitionSerializer(many=True, read_only=True)
-    stage_count = serializers.IntegerField(read_only=True)
+    stage_count = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkflowDefinition
@@ -48,14 +48,20 @@ class WorkflowDefinitionSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
 
+    def get_stage_count(self, obj):
+        return obj.stages.count()
+
 
 class WorkflowDefinitionListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list views."""
-    stage_count = serializers.IntegerField(read_only=True)
+    stage_count = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkflowDefinition
         fields = ['id', 'name', 'description', 'model_type', 'is_active', 'stage_count']
+
+    def get_stage_count(self, obj):
+        return obj.stages.count()
 
 
 class WorkflowApprovalGateSerializer(serializers.ModelSerializer):
