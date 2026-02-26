@@ -23,13 +23,15 @@ def _db_check(request):
     import os
     mig_files = {}
     for app_dir in ['users', 'training', 'forms', 'documents', 'capa', 'complaints',
-                     'deviations', 'change_controls', 'suppliers', 'audit_mgmt', 'workflows']:
+                     'deviations', 'change_controls', 'suppliers', 'audit_mgmt', 'workflows',
+                     'risk_management', 'design_controls', 'equipment', 'batch_records',
+                     'validation_mgmt', 'management_review']:
         mig_path = os.path.join('/app', app_dir, 'migrations')
         if os.path.isdir(mig_path):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v16-email-notifications'
+    result['build_marker'] = 'v17-new-modules'
     return JsonResponse(result)
 
 
