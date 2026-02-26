@@ -733,13 +733,64 @@ class DocumentViewSet(viewsets.ModelViewSet):
         serializer = DocumentSnapshotSerializer(snapshots, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get', 'post'])
     def approvers(self, request, pk=None):
-        """List all approvers for a document with their approval status."""
+        """List or add approvers for a document."""
         document = self.get_object()
-        approvers = document.approvers.all().order_by('sequence')
-        serializer = DocumentApproverSerializer(approvers, many=True)
-        return Response(serializer.data)
+
+        if request.method == 'GET':
+            approvers = document.approvers.all().order_by('sequence')
+            serializer = DocumentApproverSerializer(approvers, many=True)
+            return Response(serializer.data)
+
+        # POST: Add approver(s) to document
+        from django.contrib.auth.models import User as AuthUser
+        approvers_data = request.data.get('approvers', [])
+        if not isinstance(approvers_data, list):
+            approvers_data = [approvers_data]
+
+        results = []
+        for appr in approvers_data:
+            user_id = appr.get('user_id') if isinstance(appr, dict) else appr
+            role_label = appr.get('role', 'Reviewer') if isinstance(appr, dict) else 'Reviewer'
+            seq = appr.get('sequence', 1) if isinstance(appr, dict) else 1
+
+            try:
+                user = AuthUser.objects.get(id=user_id)
+                obj, created = DocumentApprover.objects.update_or_create(
+                    document=document,
+                    approver=user,
+                    defaults={
+                        'sequence': seq,
+                        'role_required': role_label,
+                        'approval_status': 'pending'
+                    }
+                )
+                results.append({
+                    'id': obj.id,
+                    'user_id': user.id,
+                    'username': user.username,
+                    'full_name': user.get_full_name(),
+                    'role': role_label,
+                    'sequence': seq,
+                    'status': obj.approval_status,
+                    'created': created
+                })
+            except AuthUser.DoesNotExist:
+                results.append({'user_id': user_id, 'error': 'User not found'})
+
+        return Response({'approvers': results}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path='approvers/(?P<approver_id>[^/.]+)')
+    def remove_approver(self, request, pk=None, approver_id=None):
+        """Remove an approver from a document."""
+        document = self.get_object()
+        try:
+            approver = document.approvers.get(id=approver_id)
+            approver.delete()
+            return Response({'message': 'Approver removed'}, status=status.HTTP_204_NO_CONTENT)
+        except DocumentApprover.DoesNotExist:
+            return Response({'error': 'Approver not found'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['get'])
     def versions(self, request, pk=None):
