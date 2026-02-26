@@ -207,6 +207,16 @@ class EnhancedDashboardView(views.APIView):
 
     def get(self, request, *args, **kwargs):
         """Get enhanced dashboard data"""
+        import traceback
+        try:
+            return self._get_dashboard(request)
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }, status=500)
+
+    def _get_dashboard(self, request):
         # Summary counts
         total_documents = Document.objects.count()
         total_capas = CAPA.objects.count()
