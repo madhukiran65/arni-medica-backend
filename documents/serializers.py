@@ -526,7 +526,7 @@ class DocumentSuggestionSerializer(serializers.ModelSerializer):
             'document_version', 'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'author', 'author_username', 'author_name',
+            'id', 'document', 'author', 'author_username', 'author_name',
             'reviewed_by', 'reviewed_by_username', 'reviewed_at',
             'document_version', 'created_at', 'updated_at',
         ]
