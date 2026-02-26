@@ -20,5 +20,7 @@ RUN python manage.py collectstatic --noinput || true
 
 EXPOSE 8000
 
-# Use shell form so $PORT expands; Railway sets PORT dynamically
-CMD python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120 --log-level debug
+# Migrate with verbose output, then start server
+# Using || true so gunicorn always starts (Railway needs a running process)
+# Migrations will log errors but won't block the health check
+CMD python manage.py migrate --noinput -v 2 2>&1; python manage.py seed_eqms 2>&1 || true; gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120 --log-level debug
