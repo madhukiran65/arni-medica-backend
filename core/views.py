@@ -265,19 +265,27 @@ def send_test_email(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    success = NotificationService.send_test_email(recipient_email, recipient_name)
-
-    if success:
+    try:
+        success = NotificationService.send_test_email(recipient_email, recipient_name)
+        if success:
+            return Response({
+                'status': 'sent',
+                'message': f'Test email sent successfully to {recipient_email}',
+                'email_backend': settings.EMAIL_BACKEND,
+            })
+        else:
+            return Response({
+                'status': 'failed',
+                'message': f'Failed to send test email to {recipient_email}',
+                'email_backend': settings.EMAIL_BACKEND,
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
         return Response({
-            'status': 'sent',
-            'message': f'Test email sent successfully to {recipient_email}',
+            'status': 'error',
+            'message': str(e),
             'email_backend': settings.EMAIL_BACKEND,
-        })
-    else:
-        return Response(
-            {'status': 'failed', 'message': f'Failed to send test email to {recipient_email}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+            'hint': 'For Gmail, use an App Password (not your regular password). Go to myaccount.google.com > Security > 2FA > App passwords.',
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
