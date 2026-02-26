@@ -507,6 +507,34 @@ class DocumentCommentSerializer(serializers.ModelSerializer):
         return obj.replies.count()
 
 
+class DocumentSuggestionSerializer(serializers.ModelSerializer):
+    """Serializer for track changes / suggestions."""
+    author_username = serializers.CharField(source='author.username', read_only=True)
+    author_name = serializers.SerializerMethodField()
+    reviewed_by_username = serializers.CharField(
+        source='reviewed_by.username', read_only=True, default=None
+    )
+
+    class Meta:
+        from .models import DocumentSuggestion
+        model = DocumentSuggestion
+        fields = [
+            'id', 'document', 'author', 'author_username', 'author_name',
+            'suggestion_type', 'selection_from', 'selection_to',
+            'original_text', 'suggested_text', 'reason',
+            'status', 'reviewed_by', 'reviewed_by_username', 'reviewed_at',
+            'document_version', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'author', 'author_username', 'author_name',
+            'reviewed_by', 'reviewed_by_username', 'reviewed_at',
+            'document_version', 'created_at', 'updated_at',
+        ]
+
+    def get_author_name(self, obj):
+        return f"{obj.author.first_name} {obj.author.last_name}".strip() or obj.author.username
+
+
 class DocumentContentUpdateSerializer(serializers.Serializer):
     """Serializer for saving document content from the TipTap editor."""
     content = serializers.JSONField(required=True, help_text="TipTap ProseMirror JSON")

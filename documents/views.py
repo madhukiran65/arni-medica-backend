@@ -20,6 +20,7 @@ from .models import (
     DocumentVersion,
     DocumentApprover,
     DocumentComment,
+    DocumentSuggestion,
 )
 from .serializers import (
     DocumentInfocardTypeSerializer,
@@ -32,6 +33,7 @@ from .serializers import (
     DocumentVersionSerializer,
     DocumentApproverSerializer,
     DocumentCommentSerializer,
+    DocumentSuggestionSerializer,
     DocumentContentUpdateSerializer,
     CheckoutActionSerializer,
     CheckinActionSerializer,
@@ -990,6 +992,91 @@ class DocumentViewSet(viewsets.ModelViewSet):
         comment.save()
 
         return Response(DocumentCommentSerializer(comment).data)
+
+    # ---------------------------------------------------------------
+    # SUGGESTIONS / TRACK CHANGES ENDPOINTS
+    # ---------------------------------------------------------------
+
+    @action(detail=True, methods=['get', 'post'], url_path='suggestions')
+    def suggestions(self, request, pk=None):
+        """
+        GET: List all suggestions for this document.
+        POST: Create a new suggestion (track change).
+        """
+        document = self.get_object()
+
+        if request.method == 'GET':
+            qs = DocumentSuggestion.objects.filter(
+                document=document
+            ).select_related('author', 'reviewed_by')
+
+            status_filter = request.query_params.get('status')
+            if status_filter:
+                qs = qs.filter(status=status_filter)
+
+            serializer = DocumentSuggestionSerializer(qs, many=True)
+            return Response(serializer.data)
+
+        # POST — create suggestion
+        serializer = DocumentSuggestionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            author=request.user,
+            document=document,
+            document_version=document.version_string,
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='suggestions/(?P<suggestion_id>[0-9]+)/accept')
+    def accept_suggestion(self, request, pk=None, suggestion_id=None):
+        """Accept a suggestion and apply the text change to the document content."""
+        document = self.get_object()
+        suggestion = get_object_or_404(DocumentSuggestion, pk=suggestion_id, document=document)
+
+        if suggestion.status != 'pending':
+            return Response(
+                {'error': f'Suggestion is already {suggestion.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        suggestion.status = 'accepted'
+        suggestion.reviewed_by = request.user
+        suggestion.reviewed_at = timezone.now()
+        suggestion.save()
+
+        return Response(DocumentSuggestionSerializer(suggestion).data)
+
+    @action(detail=True, methods=['post'], url_path='suggestions/(?P<suggestion_id>[0-9]+)/reject')
+    def reject_suggestion(self, request, pk=None, suggestion_id=None):
+        """Reject a suggestion."""
+        document = self.get_object()
+        suggestion = get_object_or_404(DocumentSuggestion, pk=suggestion_id, document=document)
+
+        if suggestion.status != 'pending':
+            return Response(
+                {'error': f'Suggestion is already {suggestion.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        suggestion.status = 'rejected'
+        suggestion.reviewed_by = request.user
+        suggestion.reviewed_at = timezone.now()
+        suggestion.save()
+
+        return Response(DocumentSuggestionSerializer(suggestion).data)
+
+    @action(detail=True, methods=['post'], url_path='suggestions/bulk-accept')
+    def bulk_accept_suggestions(self, request, pk=None):
+        """Accept all pending suggestions for this document."""
+        document = self.get_object()
+        updated = DocumentSuggestion.objects.filter(
+            document=document, status='pending'
+        ).update(
+            status='accepted',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now(),
+        )
+        return Response({'accepted_count': updated})
 
     # ---------------------------------------------------------------
     # EXPORT ENDPOINTS

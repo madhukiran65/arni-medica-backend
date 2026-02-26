@@ -1102,4 +1102,88 @@ class DocumentComment(AuditedModel):
         return f"{prefix} {self.author.username} on {self.document.document_id}: {self.text[:50]}"
 
 
+class DocumentSuggestion(AuditedModel):
+    """
+    Track changes / suggestion mode for document corrections.
+
+    When a reviewer edits text in suggestion mode, their changes are captured
+    as suggestions (original_text → suggested_text) rather than applied directly.
+    The document author can then accept or reject each suggestion.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+    ]
+
+    SUGGESTION_TYPE_CHOICES = [
+        ('replace', 'Replace Text'),
+        ('insert', 'Insert Text'),
+        ('delete', 'Delete Text'),
+        ('format', 'Format Change'),
+    ]
+
+    document = models.ForeignKey(
+        Document, on_delete=models.CASCADE, related_name='suggestions'
+    )
+    author = models.ForeignKey(
+        'auth.User', on_delete=models.PROTECT, related_name='document_suggestions'
+    )
+
+    # Suggestion type
+    suggestion_type = models.CharField(
+        max_length=20, choices=SUGGESTION_TYPE_CHOICES, default='replace'
+    )
+
+    # Text positions (ProseMirror positions)
+    selection_from = models.PositiveIntegerField(
+        help_text="ProseMirror position: start of affected text"
+    )
+    selection_to = models.PositiveIntegerField(
+        help_text="ProseMirror position: end of affected text"
+    )
+
+    # Content
+    original_text = models.TextField(
+        blank=True, default='',
+        help_text="Original text being replaced/deleted"
+    )
+    suggested_text = models.TextField(
+        blank=True, default='',
+        help_text="Suggested replacement text (empty for deletions)"
+    )
+    reason = models.TextField(
+        blank=True, default='',
+        help_text="Reason for the suggested change"
+    )
+
+    # Resolution
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default='pending'
+    )
+    reviewed_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reviewed_suggestions'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    # Version tracking
+    document_version = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text="Document version when suggestion was created"
+    )
+
+    class Meta:
+        ordering = ['selection_from', 'created_at']
+        indexes = [
+            models.Index(fields=['document', 'status']),
+            models.Index(fields=['document', 'author']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        action = self.get_suggestion_type_display()
+        return f"[{action}] {self.author.username} on {self.document.document_id}: {self.original_text[:30]}→{self.suggested_text[:30]}"
+
+
 # ElectronicSignature is defined in core.models — use core.ElectronicSignature
