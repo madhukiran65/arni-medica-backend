@@ -94,7 +94,7 @@ class DocumentCheckoutSerializer(serializers.ModelSerializer):
             'checked_out_at',
             'expected_checkin_date',
             'is_active',
-            'reason',
+            'checkout_reason',
         ]
         read_only_fields = ['id', 'checked_out_at']
 
@@ -412,12 +412,9 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     
     def get_current_checkout(self, obj):
         """Get the current active checkout if exists."""
-        try:
-            checkout = obj.active_checkout
-            if checkout and checkout.is_active:
-                return DocumentCheckoutSerializer(checkout).data
-        except DocumentCheckout.DoesNotExist:
-            pass
+        checkout = obj.get_active_checkout()
+        if checkout:
+            return DocumentCheckoutSerializer(checkout).data
         return None
     
     def get_approval_status(self, obj):

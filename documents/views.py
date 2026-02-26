@@ -105,7 +105,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         'owner',
         'locked_by'
     ).prefetch_related(
-        'active_checkout',
+        'checkouts',
         'snapshots',
         'versions',
         'approvers',
@@ -177,12 +177,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document = self.get_object()
 
         # Validation: check if already checked out
-        if document.active_checkout and document.active_checkout.is_active:
+        active_checkout = document.get_active_checkout()
+        if active_checkout:
             return Response(
                 {
                     'error': 'Document is already checked out',
-                    'checked_out_by': document.active_checkout.checked_out_by.username,
-                    'checked_out_at': document.active_checkout.checked_out_at.isoformat()
+                    'checked_out_by': active_checkout.checked_out_by.username,
+                    'checked_out_at': active_checkout.checked_out_at.isoformat()
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -241,8 +242,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         try:
             # Validation: document must be checked out
-            checkout = document.active_checkout
-            if not checkout or not checkout.is_active:
+            checkout = document.get_active_checkout()
+            if not checkout:
                 return Response(
                     {'error': 'Document is not currently checked out'},
                     status=status.HTTP_400_BAD_REQUEST

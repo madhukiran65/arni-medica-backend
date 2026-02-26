@@ -114,10 +114,10 @@ class DocumentCheckout(models.Model):
     Only one active checkout per document is permitted.
     """
     
-    document = models.OneToOneField(
+    document = models.ForeignKey(
         'Document',
         on_delete=models.CASCADE,
-        related_name='active_checkout',
+        related_name='checkouts',
         help_text="Document being edited"
     )
     checked_out_by = models.ForeignKey(
@@ -966,28 +966,31 @@ class Document(AuditedModel):
             return file_hash.hexdigest()
         return ""
     
+    def get_active_checkout(self):
+        """Get the active checkout for this document, if any."""
+        return self.checkouts.filter(is_active=True).first()
+
     def is_checkout_active(self):
         """Check if document has an active checkout."""
-        if hasattr(self, 'active_checkout'):
-            return self.active_checkout and self.active_checkout.is_active
-        return False
-    
+        return self.get_active_checkout() is not None
+
     def can_be_edited(self, user):
         """
         Determine if user can edit this document.
-        
+
         Args:
             user (User): User attempting to edit
-            
+
         Returns:
             bool: True if document can be edited by user
         """
         if self.is_locked:
             return self.locked_by == user
-        
-        if self.is_checkout_active():
-            return self.active_checkout.checked_out_by == user
-        
+
+        active = self.get_active_checkout()
+        if active:
+            return active.checked_out_by == user
+
         return self.vault_state == 'draft'
     
     def get_approval_status(self):
