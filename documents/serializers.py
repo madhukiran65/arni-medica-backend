@@ -226,7 +226,7 @@ class DocumentChangeApprovalSerializer(serializers.ModelSerializer):
 
 class DocumentListSerializer(serializers.ModelSerializer):
     """Compact serializer for document lists."""
-    
+
     infocard_type_name = serializers.CharField(
         source='infocard_type.name',
         read_only=True
@@ -234,11 +234,13 @@ class DocumentListSerializer(serializers.ModelSerializer):
     version_string = serializers.SerializerMethodField()
     department_name = serializers.CharField(
         source='department.name',
-        read_only=True
+        read_only=True,
+        default=None
     )
     owner_username = serializers.CharField(
         source='owner.username',
-        read_only=True
+        read_only=True,
+        default=None
     )
     
     class Meta:
@@ -282,19 +284,23 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     )
     subtype_name = serializers.CharField(
         source='subtype.name',
-        read_only=True
+        read_only=True,
+        default=None
     )
     department_name = serializers.CharField(
         source='department.name',
-        read_only=True
+        read_only=True,
+        default=None
     )
     owner_username = serializers.CharField(
         source='owner.username',
-        read_only=True
+        read_only=True,
+        default=None
     )
     locked_by_username = serializers.CharField(
         source='locked_by.username',
-        read_only=True
+        read_only=True,
+        default=None
     )
     version_string = serializers.SerializerMethodField()
     versions = DocumentVersionSerializer(
