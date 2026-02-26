@@ -324,7 +324,7 @@ class EnhancedDashboardView(views.APIView):
             ).count()
 
             closed = CAPA.objects.filter(
-                status='closed',
+                current_phase='closure',
                 updated_at__gte=month_start,
                 updated_at__lt=month_end
             ).count()
@@ -562,7 +562,7 @@ class QualityTrendsView(views.APIView):
             ).count()
 
             closed = CAPA.objects.filter(
-                status='closed',
+                current_phase='closure',
                 updated_at__gte=month_start,
                 updated_at__lt=month_end
             ).count()
