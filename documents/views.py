@@ -1359,73 +1359,218 @@ class DocumentViewSet(viewsets.ModelViewSet):
                     table.rows[i].cells[j].text = cell_text
 
     def _export_pdf(self, document, html_content):
-        """Export document as PDF using xhtml2pdf."""
-        from io import BytesIO
-        from django.http import HttpResponse
-
-        styled_html = self._wrap_html_for_export(document, html_content)
-        # Add PDF-specific styles
-        styled_html = styled_html.replace('</style>', """
-  @page { size: A4; margin: 2cm; }
-  body { font-size: 11pt; }
-</style>""")
-
-        buffer = BytesIO()
-        try:
-            from xhtml2pdf import pisa
-            pisa_status = pisa.CreatePDF(styled_html, dest=buffer)
-            if pisa_status.err:
-                return Response(
-                    {'error': 'PDF generation encountered errors.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-        except ImportError:
-            # Fallback: use reportlab directly for basic PDF
-            return self._export_pdf_reportlab(document, html_content)
-
-        buffer.seek(0)
-        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{document.document_id}.pdf"'
-        return response
-
-    def _export_pdf_reportlab(self, document, html_content):
-        """Fallback PDF export using reportlab if xhtml2pdf is not available."""
+        """Export document as PDF using reportlab with rich formatting from HTML."""
         from io import BytesIO
         from django.http import HttpResponse
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.units import cm, mm
+        from reportlab.lib.colors import HexColor
+        from reportlab.lib.enums import TA_LEFT, TA_CENTER
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
+            Table as RLTable, TableStyle, ListFlowable, ListItem
+        )
+        from bs4 import BeautifulSoup
         import re
 
         buffer = BytesIO()
-        doc_pdf = SimpleDocTemplate(buffer, pagesize=A4,
-                                     leftMargin=2*cm, rightMargin=2*cm,
-                                     topMargin=2*cm, bottomMargin=2*cm)
+        doc_pdf = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            leftMargin=2*cm, rightMargin=2*cm,
+            topMargin=2*cm, bottomMargin=2*cm
+        )
         styles = getSampleStyleSheet()
 
-        story = []
-        # Title
-        story.append(Paragraph(document.title, styles['Title']))
-        story.append(Paragraph(
-            f"Document ID: {document.document_id} | Version: {document.version_string} | Status: {document.vault_state.title()}",
-            styles['Normal']
+        # Custom styles
+        styles.add(ParagraphStyle(
+            'DocTitle', parent=styles['Title'],
+            fontSize=20, textColor=HexColor('#0f172a'),
+            spaceAfter=6
         ))
-        story.append(Spacer(1, 12))
+        styles.add(ParagraphStyle(
+            'DocMeta', parent=styles['Normal'],
+            fontSize=9, textColor=HexColor('#64748b'),
+            spaceAfter=16
+        ))
+        styles.add(ParagraphStyle(
+            'DocH1', parent=styles['Heading1'],
+            fontSize=16, textColor=HexColor('#0f172a'),
+            spaceBefore=16, spaceAfter=8,
+            borderWidth=1, borderColor=HexColor('#e2e8f0'), borderPadding=4
+        ))
+        styles.add(ParagraphStyle(
+            'DocH2', parent=styles['Heading2'],
+            fontSize=14, textColor=HexColor('#1e293b'),
+            spaceBefore=12, spaceAfter=6
+        ))
+        styles.add(ParagraphStyle(
+            'DocH3', parent=styles['Heading3'],
+            fontSize=12, textColor=HexColor('#334155'),
+            spaceBefore=10, spaceAfter=4
+        ))
+        styles.add(ParagraphStyle(
+            'DocBody', parent=styles['Normal'],
+            fontSize=10, leading=16, textColor=HexColor('#1e293b'),
+            spaceAfter=6
+        ))
+        styles.add(ParagraphStyle(
+            'DocQuote', parent=styles['Normal'],
+            fontSize=10, leading=15, textColor=HexColor('#475569'),
+            leftIndent=24, spaceAfter=8, fontName='Helvetica-Oblique'
+        ))
+        styles.add(ParagraphStyle(
+            'DocCode', parent=styles['Normal'],
+            fontSize=8, fontName='Courier', textColor=HexColor('#e2e8f0'),
+            backColor=HexColor('#1e293b'), leftIndent=12, rightIndent=12,
+            spaceBefore=6, spaceAfter=6
+        ))
 
-        # Convert HTML to plain paragraphs
-        plain = re.sub(r'<[^>]+>', '\n', html_content)
-        for para in plain.split('\n'):
-            para = para.strip()
-            if para:
-                story.append(Paragraph(para, styles['Normal']))
-                story.append(Spacer(1, 6))
+        story = []
+
+        # Title section
+        story.append(Paragraph(document.title, styles['DocTitle']))
+        story.append(Paragraph(
+            f"Document ID: {document.document_id} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"Version: {document.version_string} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"Status: {document.vault_state.title()}",
+            styles['DocMeta']
+        ))
+        story.append(HRFlowable(
+            width="100%", thickness=1, color=HexColor('#0d9488'),
+            spaceAfter=16
+        ))
+
+        # Parse HTML and build story
+        soup = BeautifulSoup(html_content, 'html.parser')
+        self._process_html_to_pdf(soup, story, styles)
+
+        # Footer info
+        story.append(Spacer(1, 24))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=HexColor('#e2e8f0')))
+        story.append(Paragraph(
+            f"Generated from Arni eQMS &nbsp;|&nbsp; {document.document_id} v{document.version_string}",
+            styles['DocMeta']
+        ))
 
         doc_pdf.build(story)
         buffer.seek(0)
         response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{document.document_id}.pdf"'
         return response
+
+    def _process_html_to_pdf(self, element, story, styles):
+        """Recursively convert HTML to reportlab flowables."""
+        from bs4 import NavigableString, Tag
+        from reportlab.platypus import Paragraph, Spacer, HRFlowable, ListFlowable, ListItem
+
+        for child in element.children:
+            if isinstance(child, NavigableString):
+                text = str(child).strip()
+                if text:
+                    story.append(Paragraph(text, styles['DocBody']))
+                continue
+
+            if not isinstance(child, Tag):
+                continue
+
+            tag = child.name.lower()
+
+            if tag == 'h1':
+                story.append(Paragraph(child.get_text(), styles['DocH1']))
+            elif tag == 'h2':
+                story.append(Paragraph(child.get_text(), styles['DocH2']))
+            elif tag in ('h3', 'h4'):
+                story.append(Paragraph(child.get_text(), styles['DocH3']))
+            elif tag == 'p':
+                # Process inline formatting
+                html_str = self._inline_html_for_pdf(child)
+                story.append(Paragraph(html_str, styles['DocBody']))
+            elif tag == 'ul':
+                items = []
+                for li in child.find_all('li', recursive=False):
+                    html_str = self._inline_html_for_pdf(li)
+                    items.append(ListItem(Paragraph(html_str, styles['DocBody'])))
+                if items:
+                    story.append(ListFlowable(items, bulletType='bullet', start='•'))
+            elif tag == 'ol':
+                items = []
+                for li in child.find_all('li', recursive=False):
+                    html_str = self._inline_html_for_pdf(li)
+                    items.append(ListItem(Paragraph(html_str, styles['DocBody'])))
+                if items:
+                    story.append(ListFlowable(items, bulletType='1'))
+            elif tag == 'blockquote':
+                story.append(Paragraph(child.get_text(), styles['DocQuote']))
+            elif tag == 'pre':
+                story.append(Paragraph(child.get_text(), styles['DocCode']))
+            elif tag == 'hr':
+                story.append(HRFlowable(width="100%", thickness=1, color='#e2e8f0', spaceAfter=8))
+            elif tag == 'table':
+                self._add_table_to_pdf(child, story, styles)
+            elif tag in ('div', 'section', 'article', 'main', 'body'):
+                self._process_html_to_pdf(child, story, styles)
+            else:
+                text = child.get_text().strip()
+                if text:
+                    story.append(Paragraph(text, styles['DocBody']))
+
+    def _inline_html_for_pdf(self, element):
+        """Convert inline HTML elements to reportlab-compatible HTML markup."""
+        from bs4 import NavigableString, Tag
+        parts = []
+        for child in element.children:
+            if isinstance(child, NavigableString):
+                # Escape special characters for reportlab
+                text = str(child).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                parts.append(text)
+            elif isinstance(child, Tag):
+                tag = child.name.lower()
+                inner = child.get_text().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                if tag in ('strong', 'b'):
+                    parts.append(f'<b>{inner}</b>')
+                elif tag in ('em', 'i'):
+                    parts.append(f'<i>{inner}</i>')
+                elif tag == 'u':
+                    parts.append(f'<u>{inner}</u>')
+                elif tag == 'code':
+                    parts.append(f'<font face="Courier" size="8" color="#be185d">{inner}</font>')
+                elif tag == 'a':
+                    parts.append(f'<font color="#0d9488"><u>{inner}</u></font>')
+                elif tag == 'br':
+                    parts.append('<br/>')
+                else:
+                    parts.append(inner)
+        return ''.join(parts)
+
+    def _add_table_to_pdf(self, table_element, story, styles):
+        """Convert an HTML table to a reportlab Table."""
+        from reportlab.platypus import Table as RLTable, TableStyle
+        from reportlab.lib.colors import HexColor
+
+        rows_data = []
+        for tr in table_element.find_all('tr'):
+            cells = []
+            for td in tr.find_all(['td', 'th']):
+                cells.append(td.get_text().strip())
+            if cells:
+                rows_data.append(cells)
+
+        if not rows_data:
+            return
+
+        table = RLTable(rows_data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), HexColor('#f8fafc')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#334155')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#e2e8f0')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 8))
 
 
 class DocumentChangeOrderViewSet(viewsets.ModelViewSet):
