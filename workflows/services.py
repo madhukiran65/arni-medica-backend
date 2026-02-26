@@ -234,12 +234,26 @@ class WorkflowService:
                 f"Transitioning {record} from '{from_stage.name}' to '{to_stage.name}'. "
                 f"Comments: {comments}"
             )
+            # Map to valid signature_meaning choice (max 30 chars)
+            sig_meaning_choice = 'approval'  # Default for workflow transitions
+            if reason in ('rejection', 'review_completion', 'release_authorization'):
+                sig_meaning_choice = reason.split('_')[0] if '_' in reason else reason
+            # Ensure reason is a valid REASON_CHOICES value
+            valid_reasons = [
+                'approval', 'rejection', 'review_completion',
+                'training_acknowledgment', 'release_authorization',
+                'investigation_closure', 'corrective_action_closure',
+                'audit_completion',
+            ]
+            if reason not in valid_reasons:
+                reason = 'approval'
+
             signature = ElectronicSignature.create_signature(
                 user=user,
                 content_type=content_type,
                 object_id=workflow_record.object_id,
                 content_str=f"{workflow_record.pk}|{from_stage.pk}|{to_stage.pk}|{timezone.now().isoformat()}",
-                signature_meaning=meaning,
+                signature_meaning=sig_meaning_choice,
                 reason=reason,
                 meaning=meaning,
                 ip_address=ip_address,
@@ -462,13 +476,22 @@ class WorkflowService:
                 raise SignatureRequired("Invalid signature password")
 
             wr = approval_request.workflow_record
+            # Map approval status to valid signature_meaning choice
+            sig_meaning_map = {
+                'approved': 'approval',
+                'rejected': 'rejection',
+                'deferred': 'review',
+            }
+            sig_meaning_choice = sig_meaning_map.get(status, 'approval')
+            sig_reason = 'approval' if status == 'approved' else 'rejection'
+
             signature = ElectronicSignature.create_signature(
                 user=user,
                 content_type=wr.content_type,
                 object_id=wr.object_id,
                 content_str=f"approval|{approval_request.pk}|{status}|{timezone.now().isoformat()}",
-                signature_meaning=f"Approval response: {status}. {comments}",
-                reason='approval',
+                signature_meaning=sig_meaning_choice,
+                reason=sig_reason,
                 meaning=f"Approval response: {status}. {comments}",
                 ip_address=ip_address,
             )
