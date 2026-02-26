@@ -319,6 +319,15 @@ class Command(BaseCommand):
         created = 0
         admin = User.objects.filter(is_superuser=True).first()
 
+        # Clear auto-generated employee_ids (EMP-XXXX) that may conflict
+        # These were created by _ensure_user_profiles() in prior runs
+        reserved_ids = [f"EMP-{i:04d}" for i in range(2, 17)]  # EMP-0002 to EMP-0016
+        conflicting = UserProfile.objects.filter(employee_id__in=reserved_ids)
+        for p in conflicting:
+            # Reassign to a non-conflicting temp id
+            p.employee_id = f"AUTO-{p.user.pk:04d}"
+            p.save()
+
         # Fetch departments, sites, roles, and job functions
         qa_dept = Department.objects.filter(name="Quality Assurance").first()
         qc_dept = Department.objects.filter(name="Quality Control").first()
