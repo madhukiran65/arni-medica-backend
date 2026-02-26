@@ -1,4 +1,25 @@
+from django.http import JsonResponse
+from django.db import connection
 from django.contrib import admin
+
+
+def _db_check(request):
+    """Diagnostic: check what columns exist in key tables."""
+    cursor = connection.cursor()
+    result = {}
+    for table in ['users_department', 'users_role', 'users_userprofile', 'users_site', 'users_productline']:
+        try:
+            cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' ORDER BY ordinal_position")
+            result[table] = [r[0] for r in cursor.fetchall()]
+        except Exception as e:
+            result[table] = str(e)
+    # Check migration status
+    try:
+        cursor.execute("SELECT app, name FROM django_migrations WHERE app = 'users' ORDER BY id")
+        result['migrations'] = [f"{r[0]}.{r[1]}" for r in cursor.fetchall()]
+    except Exception as e:
+        result['migrations'] = str(e)
+    return JsonResponse(result)
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -26,6 +47,8 @@ urlpatterns = [
     path('api/suppliers/', include('suppliers.urls')),
     # Health check
     path('api/health/', lambda r: __import__('django.http', fromlist=['JsonResponse']).JsonResponse({'status': 'ok'})),
+    # DB diagnostic
+    path('api/db-check/', lambda r: _db_check(r)),
     # API docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
