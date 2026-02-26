@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Approval Request</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .email-header .logo {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 30px;
+            color: #333;
+        }
+        .email-body h2 {
+            color: #1e3c72;
+            margin-top: 0;
+        }
+        .content-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #2a5298;
+            border-radius: 4px;
+        }
+        .content-section .label {
+            font-weight: 600;
+            color: #1e3c72;
+        }
+        .content-section .value {
+            margin-left: 10px;
+            color: #555;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 20px 0;
+            background-color: #2a5298;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        .cta-button:hover {
+            background-color: #1e3c72;
+        }
+        .email-footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
+        }
+        .footer-link {
+            color: #2a5298;
+            text-decoration: none;
+        }
+        .divider {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>Document Approval Required</h1>
+            <div class="logo">Arni Medica AI-EQMS</div>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{ approver_name }},</p>
+
+            <p><strong>{{ requester_name }}</strong> has requested your approval for the following document:</p>
+
+            <div class="content-section">
+                <div><span class="label">Document Title:</span><span class="value">{{ document_title }}</span></div>
+                <div><span class="label">Type:</span><span class="value">{{ document_type }}</span></div>
+            </div>
+
+            <p>Please review the document and provide your approval or rejection in the system.</p>
+
+            <div style="text-align: center;">
+                <a href="{{ approval_url }}" class="cta-button">Review & Approve Document</a>
+            </div>
+
+            <hr class="divider">
+
+            <p style="color: #666; font-size: 14px;">
+                <strong>Important:</strong> This is an automated notification from the Arni Medica AI-EQMS system.
+                Please log in to the system to take action on this approval request.
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p>
+                Arni Medica AI-EQMS | Enterprise Quality Management System
+            </p>
+            <p>
+                For questions or support, please contact your system administrator.
+            </p>
+            <p style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                © 2026 Arni Medica. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -10,6 +10,60 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
 
+class Notification(models.Model):
+    """
+    In-app notification tracking for sent emails.
+    Allows users to track notification history and read status.
+    """
+    NOTIFICATION_TYPES = [
+        ('approval_request', 'Approval Request'),
+        ('approval_complete', 'Approval Complete'),
+        ('capa_assignment', 'CAPA Assignment'),
+        ('deviation_alert', 'Deviation Alert'),
+        ('overdue_reminder', 'Overdue Reminder'),
+        ('training_reminder', 'Training Reminder'),
+    ]
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications'
+    )
+    notification_type = models.CharField(
+        max_length=30,
+        choices=NOTIFICATION_TYPES,
+        db_index=True
+    )
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+
+    # Link to the related object (document, CAPA, deviation, etc)
+    related_object_type = models.CharField(max_length=50, blank=True)
+    related_object_id = models.CharField(max_length=100, blank=True)
+
+    # Read status
+    is_read = models.BooleanField(default=False, db_index=True)
+    sent_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['recipient', '-sent_at']),
+            models.Index(fields=['recipient', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_notification_type_display()} for {self.recipient.get_full_name()}"
+
+    def mark_as_read(self):
+        """Mark notification as read with timestamp."""
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=['is_read', 'read_at'])
+
+
 class AuditedModel(models.Model):
     """
     Abstract base model providing 21 CFR Part 11 compliant audit trail.

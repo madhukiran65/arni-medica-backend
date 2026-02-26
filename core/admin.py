@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AuditLog, Attachment, ElectronicSignature
+from .models import AuditLog, Attachment, ElectronicSignature, Notification
 
 
 @admin.register(AuditLog)
@@ -61,3 +61,23 @@ class ElectronicSignatureAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False  # Immutable
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    """Admin for user notifications"""
+    list_display = [
+        'subject', 'recipient', 'notification_type',
+        'is_read', 'sent_at', 'read_at',
+    ]
+    list_filter = ['notification_type', 'is_read', 'sent_at']
+    search_fields = ['subject', 'message', 'recipient__username', 'recipient__email']
+    readonly_fields = [
+        'recipient', 'notification_type', 'subject', 'message',
+        'related_object_type', 'related_object_id', 'sent_at', 'read_at',
+    ]
+    date_hierarchy = 'sent_at'
+    ordering = ['-sent_at']
+
+    def has_add_permission(self, request):
+        return False  # Notifications are system-generated only

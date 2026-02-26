@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Due Reminder</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #00796b 0%, #004d40 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .email-header .logo {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 30px;
+            color: #333;
+        }
+        .email-body h2 {
+            color: #00796b;
+            margin-top: 0;
+        }
+        .content-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #00796b;
+            border-radius: 4px;
+        }
+        .content-section .label {
+            font-weight: 600;
+            color: #00796b;
+        }
+        .content-section .value {
+            margin-left: 10px;
+            color: #555;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 20px 0;
+            background-color: #00796b;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        .cta-button:hover {
+            background-color: #004d40;
+        }
+        .email-footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
+        }
+        .divider {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+        .info-banner {
+            background-color: #e0f2f1;
+            border-left: 4px solid #00796b;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .training-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <div class="training-icon">📚</div>
+            <h1>Training Due</h1>
+            <div class="logo">Arni Medica AI-EQMS</div>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{ trainee_name }},</p>
+
+            <p>You have training that is due soon. Please complete it by the scheduled date to maintain compliance:</p>
+
+            <div class="info-banner">
+                <strong>Training Assignment Reminder</strong>
+            </div>
+
+            <div class="content-section">
+                <div><span class="label">Training Title:</span><span class="value">{{ training_title }}</span></div>
+                <div><span class="label">Assignment ID:</span><span class="value">#{{ training_id }}</span></div>
+                {% if due_date %}
+                    <div><span class="label">Due Date:</span><span class="value">{{ due_date|date:"M d, Y" }}</span></div>
+                {% endif %}
+            </div>
+
+            <p>Complete this training to ensure you stay current with company policies, procedures, and compliance requirements. Training completion is mandatory for all employees.</p>
+
+            <div style="text-align: center;">
+                <a href="{{ training_url }}" class="cta-button">Start Training Now</a>
+            </div>
+
+            <hr class="divider">
+
+            <p style="color: #666; font-size: 14px;">
+                <strong>Training Completion Details:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Estimated completion time will be shown in the system</li>
+                    <li>You can save your progress and return later</li>
+                    <li>Upon completion, you will receive a certificate</li>
+                    <li>Your completion status will be recorded in your personnel file</li>
+                </ul>
+            </p>
+
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                <strong>If you need assistance:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Contact your training administrator</li>
+                    <li>Request an extension if you need more time</li>
+                    <li>Report technical issues to IT support</li>
+                </ul>
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p>
+                Arni Medica AI-EQMS | Enterprise Quality Management System
+            </p>
+            <p>
+                For questions or support, please contact your system administrator.
+            </p>
+            <p style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                © 2026 Arni Medica. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

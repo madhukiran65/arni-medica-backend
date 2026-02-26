@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from core.views import (
-    AuditLogViewSet, ElectronicSignatureViewSet,
+    AuditLogViewSet, ElectronicSignatureViewSet, NotificationViewSet,
     health_check, setup_initial_data,
     export_capa_pdf, export_deviation_pdf, export_audit_pdf
 )
@@ -9,6 +9,7 @@ from core.views import (
 router = DefaultRouter()
 router.register('audit-logs', AuditLogViewSet, basename='auditlog')
 router.register('electronic-signatures', ElectronicSignatureViewSet, basename='electronicsignature')
+router.register('notifications', NotificationViewSet, basename='notification')
 
 urlpatterns = [
     path('health/', health_check, name='health-check'),

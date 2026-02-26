@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from core.models import AuditLog, Attachment, ElectronicSignature
+from core.models import AuditLog, Attachment, ElectronicSignature, Notification
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
@@ -69,3 +69,25 @@ class InvalidateSignatureSerializer(serializers.Serializer):
     """Used to invalidate an electronic signature with audit trail."""
     password = serializers.CharField(write_only=True, required=True)
     invalidation_reason = serializers.CharField(required=True)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """Serializer for user notifications."""
+    recipient_name = serializers.CharField(source='recipient.get_full_name', read_only=True)
+    notification_type_display = serializers.CharField(
+        source='get_notification_type_display', read_only=True
+    )
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'recipient', 'recipient_name', 'notification_type',
+            'notification_type_display', 'subject', 'message',
+            'related_object_type', 'related_object_id',
+            'is_read', 'sent_at', 'read_at',
+        ]
+        read_only_fields = [
+            'id', 'recipient', 'recipient_name', 'notification_type',
+            'notification_type_display', 'subject', 'message',
+            'related_object_type', 'related_object_id', 'sent_at', 'read_at',
+        ]

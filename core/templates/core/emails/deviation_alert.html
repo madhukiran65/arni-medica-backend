@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Critical Deviation Alert</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: white;
+            border: 3px solid #d32f2f;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .email-header .logo {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .warning-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .email-body {
+            padding: 30px;
+            color: #333;
+        }
+        .content-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #fff3e0;
+            border-left: 4px solid #d32f2f;
+            border-radius: 4px;
+        }
+        .content-section .label {
+            font-weight: 600;
+            color: #d32f2f;
+        }
+        .content-section .value {
+            margin-left: 10px;
+            color: #555;
+        }
+        .severity-high {
+            background-color: #ffebee;
+            border: 2px solid #d32f2f;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .severity-high .badge {
+            display: inline-block;
+            background-color: #d32f2f;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 20px 0;
+            background-color: #d32f2f;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        .cta-button:hover {
+            background-color: #c62828;
+        }
+        .email-footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
+        }
+        .divider {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+        .critical-info {
+            background-color: #ffcdd2;
+            border-left: 4px solid #d32f2f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <div class="warning-icon">⚠️</div>
+            <h1>Critical Deviation Alert</h1>
+            <div class="logo">Arni Medica AI-EQMS</div>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{ recipient_name }},</p>
+
+            <p><strong>IMMEDIATE ATTENTION REQUIRED</strong> - A critical deviation has been detected in the system.</p>
+
+            <div class="severity-high">
+                <span class="badge">SEVERITY: {{ severity|upper }}</span>
+            </div>
+
+            <div class="content-section">
+                <div><span class="label">Deviation ID:</span><span class="value">#{{ deviation_id }}</span></div>
+                <div><span class="label">Title:</span><span class="value">{{ deviation_title }}</span></div>
+                <div><span class="label">Severity:</span><span class="value">{{ severity }}</span></div>
+            </div>
+
+            {% if description %}
+            <div class="critical-info">
+                <strong>Description:</strong>
+                <p>{{ description|linebreaks }}</p>
+            </div>
+            {% endif %}
+
+            <div style="text-align: center;">
+                <a href="{{ deviation_url }}" class="cta-button">View Deviation Details</a>
+            </div>
+
+            <hr class="divider">
+
+            <p style="color: #d32f2f; font-weight: 600;">
+                ⚠️ This is a critical notification. Immediate action is required to address this deviation. Failure to respond promptly may result in compliance issues.
+            </p>
+
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                <strong>Required Actions:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Log in to the system immediately to review full details</li>
+                    <li>Initiate corrective actions as outlined</li>
+                    <li>Update the status regularly in the system</li>
+                    <li>Communicate with relevant stakeholders</li>
+                </ul>
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p>
+                Arni Medica AI-EQMS | Enterprise Quality Management System
+            </p>
+            <p>
+                For urgent issues, please contact your system administrator immediately.
+            </p>
+            <p style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                © 2026 Arni Medica. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

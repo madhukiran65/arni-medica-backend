@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overdue Item Reminder</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .email-header .logo {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 30px;
+            color: #333;
+        }
+        .email-body h2 {
+            color: #f57c00;
+            margin-top: 0;
+        }
+        .content-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #f57c00;
+            border-radius: 4px;
+        }
+        .content-section .label {
+            font-weight: 600;
+            color: #f57c00;
+        }
+        .content-section .value {
+            margin-left: 10px;
+            color: #555;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 20px 0;
+            background-color: #f57c00;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        .cta-button:hover {
+            background-color: #e65100;
+        }
+        .email-footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
+        }
+        .divider {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+        .alert-banner {
+            background-color: #ffe0b2;
+            border-left: 4px solid #f57c00;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .overdue-badge {
+            display: inline-block;
+            background-color: #d84315;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>Overdue Item Reminder</h1>
+            <div class="logo">Arni Medica AI-EQMS</div>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{ assignee_name }},</p>
+
+            <p>This is a reminder that you have an overdue item that requires your attention:</p>
+
+            <div class="alert-banner">
+                <span class="overdue-badge">OVERDUE</span>
+                <strong style="margin-left: 10px;">Action Required Immediately</strong>
+            </div>
+
+            <div class="content-section">
+                <div><span class="label">Type:</span><span class="value">{{ record_type }}</span></div>
+                <div><span class="label">Title:</span><span class="value">{{ record_title }}</span></div>
+                {% if due_date %}
+                    <div><span class="label">Original Due Date:</span><span class="value">{{ due_date|date:"M d, Y" }}</span></div>
+                {% endif %}
+            </div>
+
+            <p>Please complete this item as soon as possible. Overdue items may impact compliance and quality standards.</p>
+
+            <div style="text-align: center;">
+                <a href="{{ record_url }}" class="cta-button">View Item in System</a>
+            </div>
+
+            <hr class="divider">
+
+            <p style="color: #666; font-size: 14px;">
+                <strong>Important:</strong> If you need to reschedule or require assistance with this item, please contact your manager or system administrator to discuss extensions or resource allocation.
+            </p>
+
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                <strong>What you should do now:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Log in to the system and review the item details</li>
+                    <li>Check for any dependencies or blockers</li>
+                    <li>Update the status with your progress</li>
+                    <li>Notify your manager if you need assistance</li>
+                </ul>
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p>
+                Arni Medica AI-EQMS | Enterprise Quality Management System
+            </p>
+            <p>
+                For questions or support, please contact your system administrator.
+            </p>
+            <p style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                © 2026 Arni Medica. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

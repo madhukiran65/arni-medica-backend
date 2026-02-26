@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Approval Decision</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .email-header .logo {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 30px;
+            color: #333;
+        }
+        .email-body h2 {
+            color: #1e3c72;
+            margin-top: 0;
+        }
+        .decision-badge {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin: 15px 0;
+            font-size: 16px;
+        }
+        .decision-approved {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .decision-rejected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .content-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #2a5298;
+            border-radius: 4px;
+        }
+        .content-section .label {
+            font-weight: 600;
+            color: #1e3c72;
+        }
+        .content-section .value {
+            margin-left: 10px;
+            color: #555;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 20px 0;
+            background-color: #2a5298;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        .cta-button:hover {
+            background-color: #1e3c72;
+        }
+        .email-footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
+        }
+        .divider {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>Approval Decision</h1>
+            <div class="logo">Arni Medica AI-EQMS</div>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{ owner_name }},</p>
+
+            <p>Your document has been reviewed and a decision has been made:</p>
+
+            <div style="text-align: center;">
+                {% if decision == 'approved' %}
+                    <div class="decision-badge decision-approved">✓ APPROVED</div>
+                {% else %}
+                    <div class="decision-badge decision-rejected">✕ REJECTED</div>
+                {% endif %}
+            </div>
+
+            <div class="content-section">
+                <div><span class="label">Document Title:</span><span class="value">{{ document_title }}</span></div>
+                <div><span class="label">Reviewed By:</span><span class="value">{{ approver_name }}</span></div>
+                <div><span class="label">Decision:</span><span class="value">{{ decision|upper }}</span></div>
+            </div>
+
+            <p>Please log in to the system to review the full details and any comments from the reviewer.</p>
+
+            <div style="text-align: center;">
+                <a href="{{ document_url }}" class="cta-button">View Document Details</a>
+            </div>
+
+            <hr class="divider">
+
+            <p style="color: #666; font-size: 14px;">
+                <strong>Next Steps:</strong> Review the decision and any feedback provided by the reviewer. If you have questions, please contact {{ approver_name }} directly.
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p>
+                Arni Medica AI-EQMS | Enterprise Quality Management System
+            </p>
+            <p>
+                For questions or support, please contact your system administrator.
+            </p>
+            <p style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                © 2026 Arni Medica. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

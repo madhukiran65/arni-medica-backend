@@ -9,11 +9,13 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 import hashlib
-from core.models import AuditLog, ElectronicSignature
+from core.models import AuditLog, ElectronicSignature, Notification
 from core.serializers import (
     AuditLogSerializer, ElectronicSignatureSerializer,
-    SignatureRequestSerializer, InvalidateSignatureSerializer
+    SignatureRequestSerializer, InvalidateSignatureSerializer,
+    NotificationSerializer
 )
 from core.permissions import CanViewAuditTrail, CanSignDocuments
 from core.pdf_export import generate_capa_report, generate_deviation_report, generate_audit_report
@@ -199,6 +201,49 @@ class ElectronicSignatureViewSet(viewsets.ModelViewSet):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for managing user notifications.
+    Provides listing, filtering, and marking notifications as read.
+    """
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['notification_type', 'is_read']
+    ordering_fields = ['-sent_at', 'notification_type']
+    ordering = ['-sent_at']
+
+    def get_queryset(self):
+        """Return notifications for the current user only."""
+        return Notification.objects.filter(recipient=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """Mark a notification as read."""
+        notification = self.get_object()
+        notification.mark_as_read()
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def mark_all_as_read(self, request):
+        """Mark all unread notifications as read for current user."""
+        Notification.objects.filter(
+            recipient=request.user,
+            is_read=False
+        ).update(is_read=True, read_at=timezone.now())
+        return Response({'status': 'All notifications marked as read'})
+
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get count of unread notifications."""
+        count = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False
+        ).count()
+        return Response({'unread_count': count})
 
 
 @api_view(['GET'])
