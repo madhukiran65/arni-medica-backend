@@ -124,6 +124,16 @@ class Role(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    field_level_permissions = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Module.field: read/write/hidden"
+    )
+    ui_visibility_rules = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Module: visible/hidden"
+    )
 
     class Meta:
         ordering = ['name']
@@ -179,6 +189,26 @@ class UserProfile(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_external_auditor = models.BooleanField(
+        default=False,
+        help_text="User is an external auditor"
+    )
+    external_access_expiry = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When external access expires"
+    )
+    account_deactivation_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date when account was deactivated"
+    )
+    deactivation_reason = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        help_text="Reason for account deactivation"
+    )
 
     class Meta:
         ordering = ['user__first_name', 'user__last_name']

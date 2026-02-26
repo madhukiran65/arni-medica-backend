@@ -3,6 +3,9 @@ from django.utils import timezone
 from core.models import AuditedModel
 from users.models import Department
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 
 class Complaint(AuditedModel):
@@ -376,6 +379,53 @@ class Complaint(AuditedModel):
         default=False,
         help_text="Whether field action is required"
     )
+    reportability_decision_tree = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Decision tree answers for reportability determination"
+    )
+    auto_generated_form = models.CharField(
+        max_length=50,
+        choices=(
+            ('fda_3500a', 'FDA 3500A'),
+            ('fda_3500', 'FDA 3500'),
+            ('emdr', 'eMDR'),
+            ('mir', 'MIR'),
+            ('none', 'None')
+        ),
+        default='none',
+        blank=True,
+        help_text="Auto-generated regulatory form type"
+    )
+    affected_lot_numbers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of affected lot/batch numbers"
+    )
+    quarantine_triggered = models.BooleanField(
+        default=False,
+        help_text="Whether product quarantine was initiated"
+    )
+    pms_linked = models.BooleanField(
+        default=False,
+        help_text="Linked to PMS (Post-Market Surveillance) trend analysis"
+    )
+    patient_follow_up_required = models.BooleanField(
+        default=False,
+        help_text="Whether patient follow-up is required"
+    )
+    patient_follow_up_status = models.CharField(
+        max_length=20,
+        choices=(
+            ('pending', 'Pending'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('na', 'N/A')
+        ),
+        default='na',
+        blank=True,
+        help_text="Status of patient follow-up"
+    )
     
     class Meta:
         ordering = ['-received_date']
@@ -569,3 +619,567 @@ class ComplaintComment(models.Model):
     
     def __str__(self):
         return f"{self.complaint.complaint_id} - Comment by {self.author.username}"
+
+
+# ============================================================================
+# PMS (Post-Market Surveillance) Models - Merged from pms app
+# ============================================================================
+
+
+class PMSPlan(AuditedModel):
+    """Post-Market Surveillance Plan"""
+
+    REVIEW_FREQUENCY_CHOICES = (
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('semi_annual', 'Semi-Annual'),
+        ('annual', 'Annual'),
+    )
+
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('under_review', 'Under Review'),
+        ('closed', 'Closed'),
+    )
+
+    plan_id = models.CharField(max_length=50, unique=True, editable=False)
+    title = models.CharField(max_length=255)
+    product_name = models.CharField(max_length=255)
+    product_line = models.ForeignKey(
+        'users.ProductLine',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    plan_version = models.CharField(max_length=50)
+    data_sources = models.JSONField(
+        default=list,
+        help_text='List of data sources: complaints, literature, clinical, service',
+    )
+    monitoring_criteria = models.TextField()
+    review_frequency = models.CharField(
+        max_length=20,
+        choices=REVIEW_FREQUENCY_CHOICES,
+    )
+    responsible_person = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='pms_plans',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft',
+    )
+    effective_date = models.DateField(null=True, blank=True)
+    next_review_date = models.DateField(null=True, blank=True)
+    department = models.ForeignKey(
+        'users.Department',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['plan_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['product_line']),
+        ]
+
+    def __str__(self):
+        return f"{self.plan_id} - {self.title}"
+
+    def save(self, *args, **kwargs):
+        if not self.plan_id:
+            last_plan = PMSPlan.objects.filter(
+                plan_id__startswith='PMS-'
+            ).order_by('-created_at').first()
+            if last_plan:
+                last_num = int(last_plan.plan_id.split('-')[1])
+                self.plan_id = f"PMS-{last_num + 1:04d}"
+            else:
+                self.plan_id = "PMS-0001"
+        super().save(*args, **kwargs)
+
+
+class TrendAnalysis(AuditedModel):
+    """Trend Analysis for surveillance data"""
+
+    TREND_DIRECTION_CHOICES = (
+        ('increasing', 'Increasing'),
+        ('decreasing', 'Decreasing'),
+        ('stable', 'Stable'),
+        ('insufficient_data', 'Insufficient Data'),
+    )
+
+    STATISTICAL_METHOD_CHOICES = (
+        ('control_chart', 'Control Chart'),
+        ('pareto', 'Pareto'),
+        ('regression', 'Regression'),
+        ('chi_square', 'Chi-Square'),
+        ('other', 'Other'),
+    )
+
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('reviewed', 'Reviewed'),
+        ('approved', 'Approved'),
+        ('action_required', 'Action Required'),
+    )
+
+    trend_id = models.CharField(max_length=50, unique=True, editable=False)
+    pms_plan = models.ForeignKey(
+        PMSPlan,
+        on_delete=models.CASCADE,
+        related_name='trend_analyses',
+    )
+    analysis_period_start = models.DateField()
+    analysis_period_end = models.DateField()
+    product_line = models.ForeignKey(
+        'users.ProductLine',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    complaint_count = models.IntegerField(default=0)
+    complaint_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True,
+    )
+    previous_period_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True,
+    )
+    trend_direction = models.CharField(
+        max_length=20,
+        choices=TREND_DIRECTION_CHOICES,
+    )
+    threshold_breached = models.BooleanField(default=False)
+    statistical_method = models.CharField(
+        max_length=20,
+        choices=STATISTICAL_METHOD_CHOICES,
+    )
+    analysis_summary = models.TextField()
+    key_findings = models.JSONField(default=list)
+    recommended_actions = models.JSONField(default=list)
+    analyzed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='trend_analyses',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['trend_id']),
+            models.Index(fields=['pms_plan']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        return f"{self.trend_id} - {self.pms_plan.title}"
+
+    def save(self, *args, **kwargs):
+        if not self.trend_id:
+            last_analysis = TrendAnalysis.objects.filter(
+                trend_id__startswith='TA-'
+            ).order_by('-created_at').first()
+            if last_analysis:
+                last_num = int(last_analysis.trend_id.split('-')[1])
+                self.trend_id = f"TA-{last_num + 1:04d}"
+            else:
+                self.trend_id = "TA-0001"
+        super().save(*args, **kwargs)
+
+
+class PMSReport(AuditedModel):
+    """Post-Market Surveillance Report"""
+
+    REPORT_TYPE_CHOICES = (
+        ('pms_report', 'PMS Report'),
+        ('psur', 'PSUR'),
+        ('pmcf_report', 'PMCF Report'),
+        ('pms_update', 'PMS Update'),
+        ('sscp', 'SSCP'),
+        ('trend_report', 'Trend Report'),
+    )
+
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('in_review', 'In Review'),
+        ('approved', 'Approved'),
+        ('submitted', 'Submitted'),
+    )
+
+    SUBMITTED_TO_CHOICES = (
+        ('fda', 'FDA'),
+        ('ema', 'EMA'),
+        ('cdsco', 'CDSCO'),
+        ('notified_body', 'Notified Body'),
+        ('internal', 'Internal'),
+        ('other', 'Other'),
+    )
+
+    report_id = models.CharField(max_length=50, unique=True, editable=False)
+    title = models.CharField(max_length=255)
+    report_type = models.CharField(
+        max_length=20,
+        choices=REPORT_TYPE_CHOICES,
+    )
+    pms_plan = models.ForeignKey(
+        PMSPlan,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reports',
+    )
+    product_line = models.ForeignKey(
+        'users.ProductLine',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    period_start = models.DateField()
+    period_end = models.DateField()
+    executive_summary = models.TextField()
+    conclusions = models.TextField()
+    recommendations = models.TextField()
+    linked_document = models.ForeignKey(
+        'documents.Document',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft',
+    )
+    submitted_to = models.CharField(
+        max_length=20,
+        choices=SUBMITTED_TO_CHOICES,
+        null=True,
+        blank=True,
+    )
+    submission_date = models.DateField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_pms_reports',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['report_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['report_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.report_id} - {self.title}"
+
+    def save(self, *args, **kwargs):
+        if not self.report_id:
+            last_report = PMSReport.objects.filter(
+                report_id__startswith='PMSR-'
+            ).order_by('-created_at').first()
+            if last_report:
+                last_num = int(last_report.report_id.split('-')[1])
+                self.report_id = f"PMSR-{last_num + 1:04d}"
+            else:
+                self.report_id = "PMSR-0001"
+        super().save(*args, **kwargs)
+
+
+class VigilanceReport(AuditedModel):
+    """Vigilance Report for regulatory submission"""
+
+    REPORT_FORM_CHOICES = (
+        ('fda_3500a', 'FDA 3500A'),
+        ('fda_3500', 'FDA 3500'),
+        ('emdr', 'EMDR'),
+        ('mir', 'MIR'),
+        ('field_safety_notice', 'Field Safety Notice'),
+        ('field_safety_corrective_action', 'Field Safety Corrective Action'),
+    )
+
+    AUTHORITY_CHOICES = (
+        ('fda', 'FDA'),
+        ('ema', 'EMA'),
+        ('cdsco', 'CDSCO'),
+        ('tga', 'TGA'),
+        ('health_canada', 'Health Canada'),
+        ('mhra', 'MHRA'),
+        ('other', 'Other'),
+    )
+
+    REPORT_TYPE_CHOICES = (
+        ('initial', 'Initial'),
+        ('followup', 'Follow-up'),
+        ('final', 'Final'),
+    )
+
+    PATIENT_OUTCOME_CHOICES = (
+        ('death', 'Death'),
+        ('life_threatening', 'Life Threatening'),
+        ('hospitalization', 'Hospitalization'),
+        ('disability', 'Disability'),
+        ('congenital_anomaly', 'Congenital Anomaly'),
+        ('intervention_required', 'Intervention Required'),
+        ('other', 'Other'),
+        ('unknown', 'Unknown'),
+    )
+
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('pending_submission', 'Pending Submission'),
+        ('submitted', 'Submitted'),
+        ('acknowledged', 'Acknowledged'),
+        ('closed', 'Closed'),
+    )
+
+    vigilance_id = models.CharField(max_length=50, unique=True, editable=False)
+    complaint = models.ForeignKey(
+        Complaint,
+        on_delete=models.CASCADE,
+        related_name='vigilance_reports',
+    )
+    report_form = models.CharField(
+        max_length=30,
+        choices=REPORT_FORM_CHOICES,
+    )
+    authority = models.CharField(
+        max_length=20,
+        choices=AUTHORITY_CHOICES,
+    )
+    report_type = models.CharField(
+        max_length=20,
+        choices=REPORT_TYPE_CHOICES,
+    )
+    submission_deadline = models.DateField()
+    actual_submission_date = models.DateField(null=True, blank=True)
+    tracking_number = models.CharField(max_length=100, null=True, blank=True)
+    narrative = models.TextField()
+    patient_outcome = models.CharField(
+        max_length=25,
+        choices=PATIENT_OUTCOME_CHOICES,
+        null=True,
+        blank=True,
+    )
+    device_udi = models.CharField(max_length=100, null=True, blank=True)
+    lot_number = models.CharField(max_length=100, null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft',
+    )
+    authority_response = models.TextField(blank=True)
+    response_date = models.DateField(null=True, blank=True)
+    submitted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='vigilance_reports',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['vigilance_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['authority']),
+        ]
+
+    def __str__(self):
+        return f"{self.vigilance_id} - {self.get_authority_display()}"
+
+    def save(self, *args, **kwargs):
+        if not self.vigilance_id:
+            last_vigilance = VigilanceReport.objects.filter(
+                vigilance_id__startswith='VR-'
+            ).order_by('-created_at').first()
+            if last_vigilance:
+                last_num = int(last_vigilance.vigilance_id.split('-')[1])
+                self.vigilance_id = f"VR-{last_num + 1:04d}"
+            else:
+                self.vigilance_id = "VR-0001"
+        super().save(*args, **kwargs)
+
+
+class LiteratureReview(AuditedModel):
+    """Literature Review for surveillance"""
+
+    STATUS_CHOICES = (
+        ('planned', 'Planned'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('action_required', 'Action Required'),
+    )
+
+    review_id = models.CharField(max_length=50, unique=True, editable=False)
+    pms_plan = models.ForeignKey(
+        PMSPlan,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='literature_reviews',
+    )
+    title = models.CharField(max_length=255)
+    search_strategy = models.TextField()
+    databases_searched = models.JSONField(default=list)
+    search_date = models.DateField()
+    articles_found = models.IntegerField(default=0)
+    articles_relevant = models.IntegerField(default=0)
+    key_findings = models.JSONField(default=list)
+    safety_signals_identified = models.BooleanField(default=False)
+    signal_description = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='literature_reviews',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='planned',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['review_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['pms_plan']),
+        ]
+
+    def __str__(self):
+        return f"{self.review_id} - {self.title}"
+
+    def save(self, *args, **kwargs):
+        if not self.review_id:
+            last_review = LiteratureReview.objects.filter(
+                review_id__startswith='LR-'
+            ).order_by('-created_at').first()
+            if last_review:
+                last_num = int(last_review.review_id.split('-')[1])
+                self.review_id = f"LR-{last_num + 1:04d}"
+            else:
+                self.review_id = "LR-0001"
+        super().save(*args, **kwargs)
+
+
+class SafetySignal(AuditedModel):
+    """Safety Signal detection and management"""
+
+    SOURCE_CHOICES = (
+        ('complaints', 'Complaints'),
+        ('literature', 'Literature'),
+        ('clinical_data', 'Clinical Data'),
+        ('registry', 'Registry'),
+        ('proactive_monitoring', 'Proactive Monitoring'),
+    )
+
+    SEVERITY_CHOICES = (
+        ('critical', 'Critical'),
+        ('major', 'Major'),
+        ('minor', 'Minor'),
+    )
+
+    STATUS_CHOICES = (
+        ('detected', 'Detected'),
+        ('under_evaluation', 'Under Evaluation'),
+        ('confirmed', 'Confirmed'),
+        ('refuted', 'Refuted'),
+        ('closed', 'Closed'),
+    )
+
+    signal_id = models.CharField(max_length=50, unique=True, editable=False)
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    source = models.CharField(
+        max_length=25,
+        choices=SOURCE_CHOICES,
+    )
+    detection_date = models.DateField()
+    product_line = models.ForeignKey(
+        'users.ProductLine',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='safety_signals',
+    )
+    severity = models.CharField(
+        max_length=10,
+        choices=SEVERITY_CHOICES,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='detected',
+    )
+    evaluation_summary = models.TextField(blank=True)
+    risk_assessment = models.TextField(blank=True)
+    action_taken = models.TextField(blank=True)
+    linked_capa = models.ForeignKey(
+        'capa.CAPA',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='safety_signals',
+    )
+    linked_pms_plan = models.ForeignKey(
+        PMSPlan,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='safety_signals',
+    )
+    evaluated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='safety_signals_evaluated',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['signal_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['severity']),
+        ]
+
+    def __str__(self):
+        return f"{self.signal_id} - {self.title}"
+
+    def save(self, *args, **kwargs):
+        if not self.signal_id:
+            last_signal = SafetySignal.objects.filter(
+                signal_id__startswith='SS-'
+            ).order_by('-created_at').first()
+            if last_signal:
+                last_num = int(last_signal.signal_id.split('-')[1])
+                self.signal_id = f"SS-{last_num + 1:04d}"
+            else:
+                self.signal_id = "SS-0001"
+        super().save(*args, **kwargs)

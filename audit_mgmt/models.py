@@ -41,6 +41,35 @@ class AuditPlan(AuditedModel):
     minor_nc = models.IntegerField(default=0)
     observations = models.IntegerField(default=0)
     next_audit_planned = models.DateField(null=True, blank=True)
+    audit_year = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Year of audit for annual planning"
+    )
+    checklist_template = models.ForeignKey(
+        'form_builder.FormTemplate',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='audit_checklists',
+        help_text="Audit checklist template"
+    )
+    auto_capa_on_major = models.BooleanField(
+        default=True,
+        help_text="Auto-generate CAPA for major findings"
+    )
+    auto_scar_on_supplier = models.BooleanField(
+        default=True,
+        help_text="Auto-generate SCAR for supplier findings"
+    )
+    auditor_independence_verified = models.BooleanField(
+        default=False,
+        help_text="Auditor independence has been verified"
+    )
+    closure_requires_capa_closed = models.BooleanField(
+        default=True,
+        help_text="Audit cannot close until all CAPAs are closed"
+    )
 
     class Meta:
         ordering = ['-created_at']
@@ -99,6 +128,22 @@ class AuditFinding(AuditedModel):
     assigned_capa = models.ForeignKey('capa.CAPA', on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_findings')
     target_closure_date = models.DateField(null=True, blank=True)
     actual_closure_date = models.DateField(null=True, blank=True)
+    auto_generated_capa = models.ForeignKey(
+        'capa.CAPA',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='audit_source_findings',
+        help_text="CAPA auto-generated from this finding"
+    )
+    auto_generated_scar = models.ForeignKey(
+        'suppliers.SupplierCorrectiveAction',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='audit_source_findings',
+        help_text="Supplier Corrective Action auto-generated from this finding"
+    )
 
     class Meta:
         ordering = ['-created_at']

@@ -1,246 +1,667 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from django.utils import timezone
 
 from .models import (
     Complaint,
     ComplaintAttachment,
-    ComplaintComment,
     MIRRecord,
+    ComplaintComment,
+    PMSPlan,
+    TrendAnalysis,
+    PMSReport,
+    VigilanceReport,
+    LiteratureReview,
+    SafetySignal,
 )
 
 
-# ============================================================================
-# USER SERIALIZER
-# ============================================================================
 class UserSerializer(serializers.ModelSerializer):
-    """Basic user information"""
-    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    """Serializer for User model"""
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'full_name']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email']
         read_only_fields = ['id']
 
 
-# ============================================================================
-# COMPLAINT ATTACHMENT SERIALIZER
-# ============================================================================
+class ComplaintListSerializer(serializers.ModelSerializer):
+    """List serializer for Complaint"""
+
+    assigned_to_name = serializers.CharField(
+        source='assigned_to.get_full_name',
+        read_only=True,
+    )
+    department_name = serializers.CharField(
+        source='department.name',
+        read_only=True,
+    )
+
+    class Meta:
+        model = Complaint
+        fields = [
+            'id',
+            'complaint_id',
+            'title',
+            'status',
+            'severity',
+            'priority',
+            'product_name',
+            'event_type',
+            'is_reportable_to_fda',
+            'mdr_submission_status',
+            'assigned_to',
+            'assigned_to_name',
+            'department',
+            'department_name',
+            'received_date',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'complaint_id', 'created_at']
+
+
+class ComplaintDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for Complaint"""
+
+    assigned_to = UserSerializer(read_only=True)
+    assigned_to_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='assigned_to',
+        write_only=True,
+        required=False,
+    )
+    investigated_by = UserSerializer(read_only=True)
+    investigated_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='investigated_by',
+        write_only=True,
+        required=False,
+    )
+
+    class Meta:
+        model = Complaint
+        fields = '__all__'
+        read_only_fields = [
+            'id',
+            'complaint_id',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+
+
 class ComplaintAttachmentSerializer(serializers.ModelSerializer):
-    """Complaint file attachment"""
-    uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
-    attachment_type_display = serializers.CharField(source='get_attachment_type_display', read_only=True)
-    file_size_mb = serializers.SerializerMethodField()
+    """Serializer for ComplaintAttachment"""
+
+    uploaded_by_name = serializers.CharField(
+        source='uploaded_by.get_full_name',
+        read_only=True,
+    )
 
     class Meta:
         model = ComplaintAttachment
         fields = [
-            'id', 'file', 'file_name', 'file_type', 'file_size', 'file_size_mb',
-            'attachment_type', 'attachment_type_display', 'description',
-            'uploaded_by', 'uploaded_by_name', 'uploaded_at'
+            'id',
+            'complaint',
+            'file',
+            'file_name',
+            'file_type',
+            'file_size',
+            'attachment_type',
+            'description',
+            'uploaded_by',
+            'uploaded_by_name',
+            'uploaded_at',
         ]
-        read_only_fields = ['id', 'file_size', 'uploaded_at']
-
-    def get_file_size_mb(self, obj):
-        return round(obj.file_size / (1024 * 1024), 2)
+        read_only_fields = ['id', 'uploaded_at']
 
 
-# ============================================================================
-# COMPLAINT COMMENT SERIALIZER
-# ============================================================================
-class ComplaintCommentSerializer(serializers.ModelSerializer):
-    """Complaint comment with threaded replies"""
-    author_name = serializers.CharField(source='author.get_full_name', read_only=True)
-    author_username = serializers.CharField(source='author.username', read_only=True)
-    replies = serializers.SerializerMethodField()
+class MIRRecordListSerializer(serializers.ModelSerializer):
+    """List serializer for MIRRecord"""
 
-    class Meta:
-        model = ComplaintComment
-        fields = [
-            'id', 'complaint', 'author', 'author_name', 'author_username',
-            'comment', 'parent', 'created_at', 'replies'
-        ]
-        read_only_fields = ['id', 'created_at']
-
-    def get_replies(self, obj):
-        if obj.parent_id is None:
-            replies = obj.replies.all()
-            return ComplaintCommentSerializer(replies, many=True).data
-        return []
-
-
-# ============================================================================
-# MIR RECORD SERIALIZER
-# ============================================================================
-class MIRRecordSerializer(serializers.ModelSerializer):
-    """Medical Incident Report (MIR) record"""
-    report_type_display = serializers.CharField(source='get_report_type_display', read_only=True)
-    parent_mir_number = serializers.CharField(source='parent_mir.mir_number', read_only=True, allow_null=True)
+    complaint_id = serializers.CharField(
+        source='complaint.complaint_id',
+        read_only=True,
+    )
 
     class Meta:
         model = MIRRecord
         fields = [
-            'id', 'complaint', 'mir_number', 'report_type', 'report_type_display',
-            'parent_mir', 'parent_mir_number', 'submitted_date', 'submitted_to',
-            'narrative', 'patient_outcome', 'device_evaluation_summary',
-            'created_at', 'updated_at'
+            'id',
+            'complaint',
+            'complaint_id',
+            'mir_number',
+            'report_type',
+            'submitted_date',
+            'created_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'mir_number', 'created_at']
 
 
-# ============================================================================
-# COMPLAINT LIST SERIALIZER
-# ============================================================================
-class ComplaintListSerializer(serializers.ModelSerializer):
-    """Compact complaint list view"""
-    department_name = serializers.CharField(source='department.name', read_only=True)
-    assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True, allow_null=True)
-    assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True, allow_null=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    severity_display = serializers.CharField(source='get_severity_display', read_only=True)
-    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
-    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
-    days_open = serializers.SerializerMethodField()
+class MIRRecordDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for MIRRecord"""
 
     class Meta:
-        model = Complaint
-        fields = [
-            'id', 'complaint_id', 'title', 'status', 'status_display',
-            'severity', 'severity_display', 'priority', 'priority_display',
-            'event_type', 'event_type_display', 'is_reportable_to_fda',
-            'received_date', 'days_open', 'department', 'department_name',
-            'assigned_to', 'assigned_to_name', 'assigned_to_username'
-        ]
-        read_only_fields = ['id']
-
-    def get_days_open(self, obj):
-        end_date = obj.actual_closure_date if obj.actual_closure_date else timezone.now().date()
-        received_date = obj.received_date.date() if hasattr(obj.received_date, 'date') else obj.received_date
-        delta = end_date - received_date
-        return delta.days
+        model = MIRRecord
+        fields = '__all__'
+        read_only_fields = ['id', 'mir_number', 'created_at', 'updated_at', 'created_by', 'updated_by']
 
 
-# ============================================================================
-# COMPLAINT DETAIL SERIALIZER
-# ============================================================================
-class ComplaintDetailSerializer(serializers.ModelSerializer):
-    """Full complaint details with attachments and comments"""
-    department_name = serializers.CharField(source='department.name', read_only=True)
-    complainant_type_display = serializers.CharField(source='get_complainant_type_display', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    category_display = serializers.CharField(source='get_category_display', read_only=True)
-    severity_display = serializers.CharField(source='get_severity_display', read_only=True)
-    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
-    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
-    patient_sex_display = serializers.CharField(source='get_patient_sex_display', read_only=True, allow_null=True)
-    device_usage_display = serializers.CharField(source='get_device_usage_display', read_only=True, allow_null=True)
-    device_available_display = serializers.CharField(source='get_device_available_display', read_only=True, allow_null=True)
-    mdr_submission_status_display = serializers.CharField(source='get_mdr_submission_status_display', read_only=True)
-    mdr_report_type_display = serializers.CharField(source='get_mdr_report_type_display', read_only=True, allow_null=True)
-    assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True, allow_null=True)
-    assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True, allow_null=True)
-    coordinator_name = serializers.CharField(source='coordinator.get_full_name', read_only=True, allow_null=True)
-    investigated_by_name = serializers.CharField(source='investigated_by.get_full_name', read_only=True, allow_null=True)
-    reportability_determined_by_name = serializers.CharField(source='reportability_determined_by.get_full_name', read_only=True, allow_null=True)
-    closed_by_name = serializers.CharField(source='closed_by.get_full_name', read_only=True, allow_null=True)
-    attachments = ComplaintAttachmentSerializer(many=True, read_only=True)
-    mir_records = MIRRecordSerializer(many=True, read_only=True)
-    root_comments = serializers.SerializerMethodField()
-    days_open = serializers.SerializerMethodField()
+class ComplaintCommentSerializer(serializers.ModelSerializer):
+    """Serializer for ComplaintComment"""
+
+    author_name = serializers.CharField(
+        source='author.get_full_name',
+        read_only=True,
+    )
 
     class Meta:
-        model = Complaint
+        model = ComplaintComment
         fields = [
-            'id', 'complaint_id', 'title', 'description', 'status', 'status_display',
-            'stage_entered_at', 'complainant_name', 'complainant_email', 'complainant_phone',
-            'complainant_organization', 'complainant_type', 'complainant_type_display',
-            'product_name', 'product_code', 'product_lot_number', 'product_serial_number',
-            'manufacture_date', 'expiry_date', 'product_description', 'event_date',
-            'event_description', 'event_location', 'event_country', 'sample_available',
-            'sample_received_date', 'category', 'category_display', 'severity',
-            'severity_display', 'priority', 'priority_display', 'event_type',
-            'event_type_display', 'patient_age', 'patient_sex', 'patient_sex_display',
-            'patient_weight_kg', 'health_effect', 'device_usage', 'device_usage_display',
-            'device_available', 'device_available_display', 'is_reportable_to_fda',
-            'reportability_determination_date', 'reportability_justification',
-            'reportability_determined_by', 'reportability_determined_by_name',
-            'awareness_date', 'mdr_report_number', 'mdr_submission_date',
-            'mdr_submission_status', 'mdr_submission_status_display', 'mdr_report_type',
-            'mdr_report_type_display', 'fda_reference_number', 'investigation_summary',
-            'root_cause', 'investigation_completed_date', 'investigated_by',
-            'investigated_by_name', 'resolution_description', 'capa', 'corrective_action',
-            'preventive_action', 'department', 'department_name', 'assigned_to',
-            'assigned_to_name', 'assigned_to_username', 'coordinator', 'coordinator_name',
-            'received_date', 'target_closure_date', 'actual_closure_date', 'closed_by',
-            'closed_by_name', 'is_trending', 'trend_category', 'requires_field_action',
-            'attachments', 'mir_records', 'root_comments', 'days_open',
-            'created_at', 'updated_at'
+            'id',
+            'complaint',
+            'author',
+            'author_name',
+            'comment',
+            'parent',
+            'created_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-    def get_root_comments(self, obj):
-        root_comments = obj.comments.filter(parent__isnull=True)
-        return ComplaintCommentSerializer(root_comments, many=True).data
-
-    def get_days_open(self, obj):
-        end_date = obj.actual_closure_date if obj.actual_closure_date else timezone.now().date()
-        received_date = obj.received_date.date() if hasattr(obj.received_date, 'date') else obj.received_date
-        delta = end_date - received_date
-        return delta.days
+        read_only_fields = ['id', 'created_at']
 
 
 # ============================================================================
-# COMPLAINT CREATE SERIALIZER
+# PMS (Post-Market Surveillance) Serializers - Merged from pms app
 # ============================================================================
-class ComplaintCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating new complaints"""
+
+
+class PMSPlanListSerializer(serializers.ModelSerializer):
+    """List serializer for PMSPlan"""
+
+    responsible_person_name = serializers.CharField(
+        source='responsible_person.get_full_name',
+        read_only=True,
+    )
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+    department_name = serializers.CharField(
+        source='department.name',
+        read_only=True,
+    )
 
     class Meta:
-        model = Complaint
+        model = PMSPlan
         fields = [
-            'title', 'description', 'complainant_name', 'complainant_email',
-            'complainant_phone', 'complainant_organization', 'complainant_type',
-            'product_name', 'product_code', 'product_lot_number', 'product_serial_number',
-            'manufacture_date', 'expiry_date', 'product_description', 'event_date',
-            'event_description', 'event_location', 'event_country', 'sample_available',
-            'sample_received_date', 'category', 'severity', 'priority', 'event_type',
-            'patient_age', 'patient_sex', 'patient_weight_kg', 'health_effect',
-            'device_usage', 'device_available', 'department'
+            'id',
+            'plan_id',
+            'title',
+            'product_name',
+            'product_line',
+            'product_line_name',
+            'plan_version',
+            'review_frequency',
+            'status',
+            'effective_date',
+            'next_review_date',
+            'responsible_person',
+            'responsible_person_name',
+            'department',
+            'department_name',
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = []
-
-    def validate(self, data):
-        """Validate required fields"""
-        if not data.get('event_description'):
-            raise serializers.ValidationError("Event description is required")
-        if not data.get('category'):
-            raise serializers.ValidationError("Category is required")
-        return data
+        read_only_fields = ['id', 'plan_id', 'created_at', 'updated_at']
 
 
-# ============================================================================
-# REPORTABILITY DETERMINATION SERIALIZER
-# ============================================================================
-class ReportabilityDeterminationSerializer(serializers.Serializer):
-    """Action serializer for determining reportability to FDA"""
-    is_reportable_to_fda = serializers.BooleanField()
-    reportability_justification = serializers.CharField(
-        max_length=5000,
-        help_text="Explanation of reportability determination"
+class PMSPlanDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for PMSPlan"""
+
+    responsible_person = UserSerializer(read_only=True)
+    responsible_person_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='responsible_person',
+        write_only=True,
+    )
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+    department_name = serializers.CharField(
+        source='department.name',
+        read_only=True,
     )
 
+    class Meta:
+        model = PMSPlan
+        fields = [
+            'id',
+            'plan_id',
+            'title',
+            'product_name',
+            'product_line',
+            'product_line_name',
+            'plan_version',
+            'data_sources',
+            'monitoring_criteria',
+            'review_frequency',
+            'responsible_person',
+            'responsible_person_id',
+            'status',
+            'effective_date',
+            'next_review_date',
+            'department',
+            'department_name',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = ['id', 'plan_id', 'created_at', 'updated_at', 'created_by', 'updated_by']
 
-# ============================================================================
-# MDR SUBMISSION SERIALIZER
-# ============================================================================
-class MDRSubmissionSerializer(serializers.Serializer):
-    """Action serializer for MDR submission"""
-    mdr_report_number = serializers.CharField(
-        max_length=100,
-        help_text="FDA assigned MDR report number"
+
+class TrendAnalysisListSerializer(serializers.ModelSerializer):
+    """List serializer for TrendAnalysis"""
+
+    pms_plan_title = serializers.CharField(
+        source='pms_plan.title',
+        read_only=True,
     )
-    mdr_submission_date = serializers.DateField()
-    mdr_report_type = serializers.ChoiceField(
-        choices=Complaint.MDR_REPORT_TYPE_CHOICES,
-        help_text="Type of MDR report"
+    analyzed_by_name = serializers.CharField(
+        source='analyzed_by.get_full_name',
+        read_only=True,
     )
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+
+    class Meta:
+        model = TrendAnalysis
+        fields = [
+            'id',
+            'trend_id',
+            'pms_plan',
+            'pms_plan_title',
+            'analysis_period_start',
+            'analysis_period_end',
+            'product_line',
+            'product_line_name',
+            'complaint_count',
+            'trend_direction',
+            'threshold_breached',
+            'status',
+            'analyzed_by',
+            'analyzed_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'trend_id', 'created_at', 'updated_at']
+
+
+class TrendAnalysisDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for TrendAnalysis"""
+
+    pms_plan_title = serializers.CharField(
+        source='pms_plan.title',
+        read_only=True,
+    )
+    analyzed_by = UserSerializer(read_only=True)
+    analyzed_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='analyzed_by',
+        write_only=True,
+    )
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+
+    class Meta:
+        model = TrendAnalysis
+        fields = [
+            'id',
+            'trend_id',
+            'pms_plan',
+            'pms_plan_title',
+            'analysis_period_start',
+            'analysis_period_end',
+            'product_line',
+            'product_line_name',
+            'complaint_count',
+            'complaint_rate',
+            'previous_period_rate',
+            'trend_direction',
+            'threshold_breached',
+            'statistical_method',
+            'analysis_summary',
+            'key_findings',
+            'recommended_actions',
+            'analyzed_by',
+            'analyzed_by_id',
+            'status',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = ['id', 'trend_id', 'created_at', 'updated_at', 'created_by', 'updated_by']
+
+
+class PMSReportListSerializer(serializers.ModelSerializer):
+    """List serializer for PMSReport"""
+
+    pms_plan_title = serializers.CharField(
+        source='pms_plan.title',
+        read_only=True,
+    )
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+    approved_by_name = serializers.CharField(
+        source='approved_by.get_full_name',
+        read_only=True,
+    )
+
+    class Meta:
+        model = PMSReport
+        fields = [
+            'id',
+            'report_id',
+            'title',
+            'report_type',
+            'pms_plan',
+            'pms_plan_title',
+            'product_line',
+            'product_line_name',
+            'period_start',
+            'period_end',
+            'status',
+            'submitted_to',
+            'submission_date',
+            'approved_by',
+            'approved_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'report_id', 'created_at', 'updated_at']
+
+
+class PMSReportDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for PMSReport"""
+
+    pms_plan_title = serializers.CharField(
+        source='pms_plan.title',
+        read_only=True,
+    )
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+    approved_by = UserSerializer(read_only=True)
+    approved_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='approved_by',
+        write_only=True,
+        required=False,
+    )
+
+    class Meta:
+        model = PMSReport
+        fields = [
+            'id',
+            'report_id',
+            'title',
+            'report_type',
+            'pms_plan',
+            'pms_plan_title',
+            'product_line',
+            'product_line_name',
+            'period_start',
+            'period_end',
+            'executive_summary',
+            'conclusions',
+            'recommendations',
+            'linked_document',
+            'status',
+            'submitted_to',
+            'submission_date',
+            'approved_by',
+            'approved_by_id',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = ['id', 'report_id', 'created_at', 'updated_at', 'created_by', 'updated_by']
+
+
+class VigilanceReportListSerializer(serializers.ModelSerializer):
+    """List serializer for VigilanceReport"""
+
+    complaint_id = serializers.CharField(
+        source='complaint.complaint_id',
+        read_only=True,
+    )
+    submitted_by_name = serializers.CharField(
+        source='submitted_by.get_full_name',
+        read_only=True,
+    )
+
+    class Meta:
+        model = VigilanceReport
+        fields = [
+            'id',
+            'vigilance_id',
+            'complaint',
+            'complaint_id',
+            'report_form',
+            'authority',
+            'report_type',
+            'submission_deadline',
+            'actual_submission_date',
+            'tracking_number',
+            'patient_outcome',
+            'status',
+            'submitted_by',
+            'submitted_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'vigilance_id', 'created_at', 'updated_at']
+
+
+class VigilanceReportDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for VigilanceReport"""
+
+    complaint_id = serializers.CharField(
+        source='complaint.complaint_id',
+        read_only=True,
+    )
+    submitted_by = UserSerializer(read_only=True)
+    submitted_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='submitted_by',
+        write_only=True,
+        required=False,
+    )
+
+    class Meta:
+        model = VigilanceReport
+        fields = [
+            'id',
+            'vigilance_id',
+            'complaint',
+            'complaint_id',
+            'report_form',
+            'authority',
+            'report_type',
+            'submission_deadline',
+            'actual_submission_date',
+            'tracking_number',
+            'narrative',
+            'patient_outcome',
+            'device_udi',
+            'lot_number',
+            'status',
+            'authority_response',
+            'response_date',
+            'submitted_by',
+            'submitted_by_id',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = ['id', 'vigilance_id', 'created_at', 'updated_at', 'created_by', 'updated_by']
+
+
+class LiteratureReviewListSerializer(serializers.ModelSerializer):
+    """List serializer for LiteratureReview"""
+
+    pms_plan_title = serializers.CharField(
+        source='pms_plan.title',
+        read_only=True,
+    )
+    reviewed_by_name = serializers.CharField(
+        source='reviewed_by.get_full_name',
+        read_only=True,
+    )
+
+    class Meta:
+        model = LiteratureReview
+        fields = [
+            'id',
+            'review_id',
+            'pms_plan',
+            'pms_plan_title',
+            'title',
+            'search_date',
+            'articles_found',
+            'articles_relevant',
+            'safety_signals_identified',
+            'status',
+            'reviewed_by',
+            'reviewed_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'review_id', 'created_at', 'updated_at']
+
+
+class LiteratureReviewDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for LiteratureReview"""
+
+    pms_plan_title = serializers.CharField(
+        source='pms_plan.title',
+        read_only=True,
+    )
+    reviewed_by = UserSerializer(read_only=True)
+    reviewed_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='reviewed_by',
+        write_only=True,
+        required=False,
+    )
+
+    class Meta:
+        model = LiteratureReview
+        fields = [
+            'id',
+            'review_id',
+            'pms_plan',
+            'pms_plan_title',
+            'title',
+            'search_strategy',
+            'databases_searched',
+            'search_date',
+            'articles_found',
+            'articles_relevant',
+            'key_findings',
+            'safety_signals_identified',
+            'signal_description',
+            'reviewed_by',
+            'reviewed_by_id',
+            'status',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = ['id', 'review_id', 'created_at', 'updated_at', 'created_by', 'updated_by']
+
+
+class SafetySignalListSerializer(serializers.ModelSerializer):
+    """List serializer for SafetySignal"""
+
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+    evaluated_by_name = serializers.CharField(
+        source='evaluated_by.get_full_name',
+        read_only=True,
+    )
+
+    class Meta:
+        model = SafetySignal
+        fields = [
+            'id',
+            'signal_id',
+            'title',
+            'source',
+            'detection_date',
+            'product_line',
+            'product_line_name',
+            'severity',
+            'status',
+            'evaluated_by',
+            'evaluated_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'signal_id', 'created_at', 'updated_at']
+
+
+class SafetySignalDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for SafetySignal"""
+
+    product_line_name = serializers.CharField(
+        source='product_line.name',
+        read_only=True,
+    )
+    evaluated_by = UserSerializer(read_only=True)
+    evaluated_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='evaluated_by',
+        write_only=True,
+        required=False,
+    )
+
+    class Meta:
+        model = SafetySignal
+        fields = [
+            'id',
+            'signal_id',
+            'title',
+            'description',
+            'source',
+            'detection_date',
+            'product_line',
+            'product_line_name',
+            'severity',
+            'status',
+            'evaluation_summary',
+            'risk_assessment',
+            'action_taken',
+            'linked_capa',
+            'linked_pms_plan',
+            'evaluated_by',
+            'evaluated_by_id',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        ]
+        read_only_fields = ['id', 'signal_id', 'created_at', 'updated_at', 'created_by', 'updated_by']

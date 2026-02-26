@@ -210,6 +210,44 @@ class Deviation(AuditedModel):
     requires_capa = models.BooleanField(default=False)
     is_recurring = models.BooleanField(default=False)
     regulatory_reportable = models.BooleanField(default=False)
+    risk_severity = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="1-5 risk severity score"
+    )
+    risk_occurrence = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="1-5 risk occurrence score"
+    )
+    risk_score = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Auto-calculated: severity * occurrence"
+    )
+    auto_escalated_to_capa = models.BooleanField(
+        default=False,
+        help_text="Deviation auto-escalated to CAPA"
+    )
+    escalation_reason = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        help_text="Reason for escalation to CAPA"
+    )
+    affected_batch_numbers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of affected batch numbers"
+    )
+    linked_equipment = models.ForeignKey(
+        'equipment.Equipment',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='deviations',
+        help_text="Equipment involved in deviation"
+    )
     
     class Meta:
         ordering = ['-reported_date']

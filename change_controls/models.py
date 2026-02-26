@@ -191,6 +191,57 @@ class ChangeControl(AuditedModel):
     requires_validation = models.BooleanField(default=False)
     requires_regulatory_notification = models.BooleanField(default=False)
     is_emergency = models.BooleanField(default=False)
+    impact_assessment_checklist = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Checklist: requires_revalidation, risk_file_update, regulatory_submission, training"
+    )
+    regulatory_submission_required = models.BooleanField(
+        default=False,
+        help_text="Whether regulatory submission is required"
+    )
+    regulatory_submission_type = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Type of regulatory submission (e.g., 510k, PMA)"
+    )
+    regulatory_submission_status = models.CharField(
+        max_length=20,
+        choices=(
+            ('not_required', 'Not Required'),
+            ('pending', 'Pending'),
+            ('submitted', 'Submitted'),
+            ('approved', 'Approved')
+        ),
+        default='not_required',
+        blank=True,
+        help_text="Status of regulatory submission"
+    )
+    effectiveness_check_required = models.BooleanField(
+        default=False,
+        help_text="Whether post-implementation effectiveness check is required"
+    )
+    effectiveness_check_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Scheduled date for effectiveness check"
+    )
+    effectiveness_check_result = models.CharField(
+        max_length=20,
+        choices=(
+            ('pending', 'Pending'),
+            ('effective', 'Effective'),
+            ('not_effective', 'Not Effective')
+        ),
+        default='pending',
+        blank=True,
+        help_text="Result of effectiveness check"
+    )
+    all_child_tasks_complete = models.BooleanField(
+        default=False,
+        help_text="All child implementation tasks are complete"
+    )
 
     class Meta:
         ordering = ['-submitted_date']

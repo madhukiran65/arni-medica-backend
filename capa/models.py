@@ -435,6 +435,51 @@ class CAPA(AuditedModel):
         default=False,
         help_text="Does this CAPA require management review?"
     )
+    effectiveness_wait_days = models.IntegerField(
+        null=True,
+        blank=True,
+        default=60,
+        help_text="Days to wait before effectiveness check"
+    )
+    effectiveness_eligible_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date when CAPA is eligible for effectiveness check"
+    )
+    parallel_investigation = models.BooleanField(
+        default=False,
+        help_text="Dual-track investigation for combination products"
+    )
+    investigation_track = models.CharField(
+        max_length=20,
+        choices=(
+            ('device', 'Device'),
+            ('pharma', 'Pharma'),
+            ('both', 'Both'),
+            ('na', 'N/A')
+        ),
+        default='na',
+        blank=True,
+        help_text="Investigation track for multi-disciplinary products"
+    )
+    similar_capas = models.ManyToManyField(
+        'self',
+        blank=True,
+        symmetrical=True,
+        help_text="Related CAPAs with similar root causes"
+    )
+    auto_generated = models.BooleanField(
+        default=False,
+        help_text="Auto-generated from audit finding or complaint"
+    )
+    source_audit_finding = models.ForeignKey(
+        'audit_mgmt.AuditFinding',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='auto_capas',
+        help_text="Audit finding that auto-generated this CAPA"
+    )
 
     class Meta:
         ordering = ['-created_at']

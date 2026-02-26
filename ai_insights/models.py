@@ -29,6 +29,48 @@ class AIInsight(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_acted_upon = models.BooleanField(default=False)
     action_taken = models.TextField(blank=True)
+    insight_category = models.CharField(
+        max_length=30,
+        choices=(
+            ('classification', 'Document Classification'),
+            ('triage', 'Complaint Triage'),
+            ('root_cause', 'Root Cause Prediction'),
+            ('training_gap', 'Training Gap'),
+            ('anomaly', 'Trend Anomaly'),
+            ('similarity', 'Similar Record'),
+            ('general', 'General')
+        ),
+        default='general',
+        blank=True,
+        help_text="Category of AI insight"
+    )
+    source_module = models.CharField(
+        max_length=30,
+        null=True,
+        blank=True,
+        help_text="Module where insight originated (e.g., complaints, deviations)"
+    )
+    prediction_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional prediction data and parameters"
+    )
+    feedback = models.CharField(
+        max_length=20,
+        choices=(
+            ('helpful', 'Helpful'),
+            ('not_helpful', 'Not Helpful'),
+            ('pending', 'Pending')
+        ),
+        default='pending',
+        blank=True,
+        help_text="User feedback on insight usefulness"
+    )
+    feedback_notes = models.TextField(
+        null=True,
+        blank=True,
+        help_text="User notes on insight feedback"
+    )
 
     class Meta:
         ordering = ['-created_at']

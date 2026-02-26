@@ -42,6 +42,14 @@ INSTALLED_APPS = [
     'change_controls.apps.ChangeControlsConfig',
     'forms.apps.FormsConfig',
     'suppliers.apps.SuppliersConfig',
+    # New modules (BRD Gap Analysis - Feb 2026)
+    'risk_management.apps.RiskManagementConfig',
+    'design_controls.apps.DesignControlsConfig',
+    'equipment.apps.EquipmentConfig',
+    'batch_records.apps.BatchRecordsConfig',
+
+    'validation_mgmt.apps.ValidationMgmtConfig',
+    'management_review.apps.ManagementReviewConfig',
 ]
 
 MIDDLEWARE = [

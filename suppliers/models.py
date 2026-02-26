@@ -76,7 +76,40 @@ class Supplier(AuditedModel):
     # Products/Services
     products_services = models.JSONField(blank=True, null=True)
     approved_materials = models.JSONField(blank=True, null=True)
-    
+    portal_access_enabled = models.BooleanField(
+        default=False,
+        help_text="Supplier can access supplier portal"
+    )
+    portal_email = models.EmailField(
+        null=True,
+        blank=True,
+        help_text="Portal login email for supplier"
+    )
+    auto_quarantine_on_cert_expiry = models.BooleanField(
+        default=True,
+        help_text="Automatically quarantine supplier on certificate expiry"
+    )
+    approved_scope = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="e.g., Approved for packaging only"
+    )
+    supplier_category = models.CharField(
+        max_length=30,
+        choices=(
+            ('drug_component', 'Drug Component'),
+            ('device_component', 'Device Component'),
+            ('packaging', 'Packaging'),
+            ('service', 'Service'),
+            ('raw_material', 'Raw Material'),
+            ('other', 'Other')
+        ),
+        default='other',
+        blank=True,
+        help_text="Supplier category"
+    )
+
     # Relations
     department = models.ForeignKey(
         Department,

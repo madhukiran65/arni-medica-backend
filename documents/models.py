@@ -828,6 +828,22 @@ class Document(AuditedModel):
         default=False,
         help_text="Whether document has related attachments"
     )
+    watermark_text = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        default="Uncontrolled Copy if Printed",
+        help_text="Watermark text for printed copies"
+    )
+    review_frequency_days = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Days between periodic reviews"
+    )
+    requires_dual_approval = models.BooleanField(
+        default=False,
+        help_text="Requires both Pharma QA and Device QA approval"
+    )
     
     # --- DOCUMENT BODY / RICH TEXT CONTENT ---
     content = models.JSONField(
@@ -1184,6 +1200,52 @@ class DocumentSuggestion(AuditedModel):
     def __str__(self):
         action = self.get_suggestion_type_display()
         return f"[{action}] {self.author.username} on {self.document.document_id}: {self.original_text[:30]}→{self.suggested_text[:30]}"
+
+
+class DocumentAcknowledgment(AuditedModel):
+    """
+    Tracks user acknowledgment of documents.
+    Records when users have read and understood critical documents.
+    """
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name='acknowledgments',
+        help_text="Document being acknowledged"
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='doc_acknowledgments',
+        help_text="User acknowledging the document"
+    )
+    acknowledged_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when document was acknowledged"
+    )
+    method = models.CharField(
+        max_length=20,
+        choices=(
+            ('read', 'Read & Understood'),
+            ('quiz', 'Completed Quiz'),
+            ('signature', 'Electronic Signature')
+        ),
+        default='read',
+        help_text="Method of acknowledgment"
+    )
+
+    class Meta:
+        unique_together = ('document', 'user')
+        ordering = ['-acknowledged_at']
+        verbose_name = 'Document Acknowledgment'
+        verbose_name_plural = 'Document Acknowledgments'
+        indexes = [
+            models.Index(fields=['document', 'user']),
+            models.Index(fields=['acknowledged_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} acknowledged {self.document.document_id}"
 
 
 # ElectronicSignature is defined in core.models — use core.ElectronicSignature

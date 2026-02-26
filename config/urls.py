@@ -126,6 +126,13 @@ urlpatterns = [
     path('api/change-controls/', include('change_controls.urls')),
     path('api/forms/', include('forms.urls')),
     path('api/suppliers/', include('suppliers.urls')),
+    # New modules (BRD Gap Analysis - Feb 2026)
+    path('api/risk-management/', include('risk_management.urls')),
+    path('api/design-controls/', include('design_controls.urls')),
+    path('api/equipment/', include('equipment.urls')),
+    path('api/batch-records/', include('batch_records.urls')),
+    path('api/validation/', include('validation_mgmt.urls')),
+    path('api/management-review/', include('management_review.urls')),
     # Health check
     path('api/health/', lambda r: __import__('django.http', fromlist=['JsonResponse']).JsonResponse({'status': 'ok'})),
     # DB diagnostic

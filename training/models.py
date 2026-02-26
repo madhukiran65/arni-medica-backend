@@ -140,6 +140,16 @@ class TrainingCourse(AuditedModel):
         related_name='training_courses_assigned'
     )
     auto_assign_on_role_change = models.BooleanField(default=False)
+    scorm_package = models.FileField(
+        upload_to='scorm_packages/',
+        null=True,
+        blank=True,
+        help_text="SCORM package file for e-learning"
+    )
+    classroom_attendance_required = models.BooleanField(
+        default=False,
+        help_text="Whether classroom attendance is required"
+    )
 
     class Meta:
         ordering = ['title']
@@ -345,6 +355,22 @@ class TrainingAssignment(AuditedModel):
         null=True,
         blank=True,
         related_name='training_assignments'
+    )
+    operational_lockout = models.BooleanField(
+        default=False,
+        help_text="Block user from operations until training complete"
+    )
+    auto_triggered = models.BooleanField(
+        default=False,
+        help_text="Auto-triggered by SOP update"
+    )
+    triggering_document = models.ForeignKey(
+        'documents.Document',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='triggered_trainings',
+        help_text="Document that triggered this training assignment"
     )
 
     class Meta:
