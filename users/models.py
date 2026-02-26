@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 class Department(models.Model):
     """Department model for organizing users"""
     name = models.CharField(max_length=255, unique=True)
-    code = models.CharField(max_length=20, unique=True, blank=True)
+    code = models.CharField(max_length=20, blank=True, default='')
     description = models.TextField(blank=True)
     head = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -36,7 +36,7 @@ class Department(models.Model):
 class Site(models.Model):
     """Manufacturing or office site"""
     name = models.CharField(max_length=255, unique=True)
-    code = models.CharField(max_length=20, unique=True, blank=True)
+    code = models.CharField(max_length=20, blank=True, default='')
     address = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
@@ -55,7 +55,7 @@ class Site(models.Model):
 class ProductLine(models.Model):
     """Product lines for the organization"""
     name = models.CharField(max_length=255, unique=True)
-    code = models.CharField(max_length=20, unique=True, blank=True)
+    code = models.CharField(max_length=20, blank=True, default='')
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
