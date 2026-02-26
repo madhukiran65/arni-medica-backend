@@ -405,9 +405,12 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     
     def get_current_checkout(self, obj):
         """Get the current active checkout if exists."""
-        checkout = obj.checkouts.filter(is_active=True).first()
-        if checkout:
-            return DocumentCheckoutSerializer(checkout).data
+        try:
+            checkout = obj.active_checkout
+            if checkout and checkout.is_active:
+                return DocumentCheckoutSerializer(checkout).data
+        except DocumentCheckout.DoesNotExist:
+            pass
         return None
     
     def get_approval_status(self, obj):
