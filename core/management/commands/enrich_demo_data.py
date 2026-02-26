@@ -1,7 +1,9 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta
-from core.models import Deviation, ChangeControl, Supplier
+from deviations.models import Deviation
+from change_controls.models import ChangeControl
+from suppliers.models import Supplier
 
 
 class Command(BaseCommand):
