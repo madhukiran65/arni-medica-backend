@@ -1545,7 +1545,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def _add_table_to_pdf(self, table_element, story, styles):
         """Convert an HTML table to a reportlab Table."""
-        from reportlab.platypus import Table as RLTable, TableStyle
+        from reportlab.platypus import Table as RLTable, TableStyle, Spacer
         from reportlab.lib.colors import HexColor
 
         rows_data = []
