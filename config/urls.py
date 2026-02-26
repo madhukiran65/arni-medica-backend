@@ -33,6 +33,23 @@ def _db_check(request):
     return JsonResponse(result)
 
 
+def _run_seed(request):
+    """Manually run seed_eqms command."""
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ['python', 'manage.py', 'seed_eqms'],
+            capture_output=True, text=True, timeout=120, cwd='/app'
+        )
+        return JsonResponse({
+            'returncode': proc.returncode,
+            'stdout': proc.stdout[-5000:] if proc.stdout else '',
+            'stderr': proc.stderr[-5000:] if proc.stderr else '',
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)})
+
+
 def _run_migrate(request):
     """Manually run migrations and return output."""
     import subprocess
@@ -78,6 +95,7 @@ urlpatterns = [
     # DB diagnostic
     path('api/db-check/', lambda r: _db_check(r)),
     path('api/run-migrate/', lambda r: _run_migrate(r)),
+    path('api/run-seed/', lambda r: _run_seed(r)),
     # API docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
