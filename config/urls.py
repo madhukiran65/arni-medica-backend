@@ -29,7 +29,7 @@ def _db_check(request):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v5-fake-migrate'
+    result['build_marker'] = 'v6-serializer-fix'
     return JsonResponse(result)
 
 
