@@ -112,7 +112,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     search_fields = ['document_id', 'legacy_document_id', 'title', 'description', 'subject_keywords']
     ordering_fields = ['created_at', 'document_id', 'title', 'next_review_date', 'vault_state']
     ordering = ['-created_at']
-    parser_classes = (MultiPartParser, FormParser)
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -733,7 +733,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         serializer = DocumentSnapshotSerializer(snapshots, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get', 'post'], parser_classes=[JSONParser, MultiPartParser, FormParser])
+    @action(detail=True, methods=['get', 'post'])
     def approvers(self, request, pk=None):
         """List or add approvers for a document."""
         document = self.get_object()
