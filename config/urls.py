@@ -29,16 +29,23 @@ def _db_check(request):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v6-serializer-fix'
+    result['build_marker'] = 'v7-seed-flags'
     return JsonResponse(result)
 
 
 def _run_seed(request):
-    """Manually run seed_eqms command."""
+    """Manually run seed_eqms command. Supports ?demo=1&reset-demo=1&reset-workflows=1."""
     import subprocess
+    cmd = ['python', 'manage.py', 'seed_eqms']
+    if request.GET.get('demo'):
+        cmd.append('--demo')
+    if request.GET.get('reset-demo'):
+        cmd.append('--reset-demo')
+    if request.GET.get('reset-workflows'):
+        cmd.append('--reset-workflows')
     try:
         proc = subprocess.run(
-            ['python', 'manage.py', 'seed_eqms'],
+            cmd,
             capture_output=True, text=True, timeout=120, cwd='/app'
         )
         return JsonResponse({
