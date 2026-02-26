@@ -829,6 +829,24 @@ class Document(AuditedModel):
         help_text="Whether document has related attachments"
     )
     
+    # --- DOCUMENT BODY / RICH TEXT CONTENT ---
+    content = models.JSONField(
+        default=dict, blank=True,
+        help_text="TipTap/ProseMirror JSON document structure for in-browser editing"
+    )
+    content_html = models.TextField(
+        blank=True, default='',
+        help_text="Rendered HTML of the document content (auto-generated from content JSON)"
+    )
+    content_plain_text = models.TextField(
+        blank=True, default='',
+        help_text="Plain text extraction for full-text search"
+    )
+    description = models.TextField(
+        blank=True, default='',
+        help_text="Brief document description / abstract"
+    )
+
     # --- FLEXIBLE CUSTOM FIELDS ---
     custom_fields = models.JSONField(
         default=dict,
@@ -1004,6 +1022,84 @@ class Document(AuditedModel):
             self.original_filename = self.file.name
         
         super().save(*args, **kwargs)
+
+
+class DocumentComment(AuditedModel):
+    """
+    Inline comments on document content for review/correction workflows.
+
+    Supports threaded replies, resolution tracking, and maps to specific
+    text selections within the TipTap editor.
+    """
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('resolved', 'Resolved'),
+        ('wont_fix', "Won't Fix"),
+    ]
+
+    COMMENT_TYPE_CHOICES = [
+        ('comment', 'Comment'),
+        ('correction', 'Correction Required'),
+        ('suggestion', 'Suggestion'),
+        ('question', 'Question'),
+    ]
+
+    document = models.ForeignKey(
+        Document, on_delete=models.CASCADE, related_name='comments'
+    )
+    parent = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies',
+        help_text="Parent comment (for threaded replies)"
+    )
+    author = models.ForeignKey(
+        'auth.User', on_delete=models.PROTECT, related_name='document_comments'
+    )
+
+    # Content
+    text = models.TextField(help_text="Comment text / correction note")
+    comment_type = models.CharField(
+        max_length=20, choices=COMMENT_TYPE_CHOICES, default='comment'
+    )
+
+    # Text selection reference (maps to TipTap marks)
+    selection_from = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="ProseMirror position: start of highlighted text"
+    )
+    selection_to = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="ProseMirror position: end of highlighted text"
+    )
+    quoted_text = models.TextField(
+        blank=True, default='',
+        help_text="The text that was selected when the comment was made"
+    )
+
+    # Resolution
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='open')
+    resolved_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='resolved_comments'
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    # Version tracking
+    document_version = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text="Document version when comment was created (e.g., '3.0')"
+    )
+
+    class Meta:
+        ordering = ['selection_from', 'created_at']
+        indexes = [
+            models.Index(fields=['document', 'status']),
+            models.Index(fields=['document', 'author']),
+            models.Index(fields=['parent']),
+        ]
+
+    def __str__(self):
+        prefix = f"[{self.get_comment_type_display()}]"
+        return f"{prefix} {self.author.username} on {self.document.document_id}: {self.text[:50]}"
 
 
 # ElectronicSignature is defined in core.models — use core.ElectronicSignature

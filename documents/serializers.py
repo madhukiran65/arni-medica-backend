@@ -373,6 +373,10 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             'is_template',
             'is_controlled_copy',
             'has_attachments',
+            'content',
+            'content_html',
+            'content_plain_text',
+            'description',
             'custom_fields',
             'versions',
             'approvers',
@@ -446,6 +450,9 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             'requires_approval',
             'is_template',
             'review_period_months',
+            'content',
+            'content_html',
+            'description',
             'custom_fields',
         ]
     
@@ -454,6 +461,56 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         document = Document(**validated_data)
         document.save()
         return document
+
+
+# ============================================================================
+# DOCUMENT COMMENT SERIALIZERS
+# ============================================================================
+
+class DocumentCommentSerializer(serializers.ModelSerializer):
+    """Full comment serializer with author info and replies."""
+    author_username = serializers.CharField(source='author.username', read_only=True)
+    author_name = serializers.SerializerMethodField()
+    resolved_by_username = serializers.CharField(
+        source='resolved_by.username', read_only=True, default=None
+    )
+    replies = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import DocumentComment
+        model = DocumentComment
+        fields = [
+            'id', 'document', 'parent', 'author', 'author_username', 'author_name',
+            'text', 'comment_type', 'selection_from', 'selection_to', 'quoted_text',
+            'status', 'resolved_by', 'resolved_by_username', 'resolved_at',
+            'document_version', 'replies', 'reply_count',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'author', 'author_username', 'author_name',
+            'resolved_by', 'resolved_by_username', 'resolved_at',
+            'document_version', 'replies', 'reply_count',
+            'created_at', 'updated_at',
+        ]
+
+    def get_author_name(self, obj):
+        return f"{obj.author.first_name} {obj.author.last_name}".strip() or obj.author.username
+
+    def get_replies(self, obj):
+        if obj.parent is not None:
+            return []  # Don't nest infinitely
+        replies = obj.replies.select_related('author', 'resolved_by').order_by('created_at')
+        return DocumentCommentSerializer(replies, many=True).data
+
+    def get_reply_count(self, obj):
+        return obj.replies.count()
+
+
+class DocumentContentUpdateSerializer(serializers.Serializer):
+    """Serializer for saving document content from the TipTap editor."""
+    content = serializers.JSONField(required=True, help_text="TipTap ProseMirror JSON")
+    content_html = serializers.CharField(required=False, default='', help_text="Rendered HTML")
 
 
 # ============================================================================

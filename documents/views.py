@@ -19,6 +19,7 @@ from .models import (
     DocumentSnapshot,
     DocumentVersion,
     DocumentApprover,
+    DocumentComment,
 )
 from .serializers import (
     DocumentInfocardTypeSerializer,
@@ -30,6 +31,8 @@ from .serializers import (
     DocumentSnapshotSerializer,
     DocumentVersionSerializer,
     DocumentApproverSerializer,
+    DocumentCommentSerializer,
+    DocumentContentUpdateSerializer,
     CheckoutActionSerializer,
     CheckinActionSerializer,
     LifecycleTransitionSerializer,
@@ -863,6 +866,195 @@ class DocumentViewSet(viewsets.ModelViewSet):
             'audit_trail': timeline,
             'total_events': len(timeline)
         })
+
+    # ---------------------------------------------------------------
+    # CONTENT EDITING ENDPOINTS
+    # ---------------------------------------------------------------
+
+    @action(detail=True, methods=['get', 'put'], url_path='content')
+    def content(self, request, pk=None):
+        """
+        GET: Return the document's TipTap JSON content.
+        PUT: Save content (requires checkout or draft state).
+        """
+        document = self.get_object()
+
+        if request.method == 'GET':
+            return Response({
+                'id': document.id,
+                'document_id': document.document_id,
+                'title': document.title,
+                'content': document.content,
+                'content_html': document.content_html,
+                'description': document.description,
+                'vault_state': document.vault_state,
+                'is_locked': document.is_locked,
+                'locked_by': document.locked_by_id,
+                'version_string': document.version_string,
+            })
+
+        # PUT — save content
+        serializer = DocumentContentUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Only allow editing in draft or if user has checkout
+        if document.vault_state != 'draft' and not (
+            document.is_locked and document.locked_by == request.user
+        ):
+            return Response(
+                {'error': 'Document must be in Draft state or checked out by you to edit.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        document.content = serializer.validated_data['content']
+        document.content_html = serializer.validated_data.get('content_html', '')
+
+        # Extract plain text for search
+        import re
+        plain = re.sub(r'<[^>]+>', '', document.content_html)
+        document.content_plain_text = plain[:50000]  # Limit for DB
+
+        document.save(update_fields=['content', 'content_html', 'content_plain_text', 'updated_at'])
+
+        from core.models import AuditLog
+        from django.contrib.contenttypes.models import ContentType
+        ct = ContentType.objects.get_for_model(Document)
+        AuditLog.objects.create(
+            content_type=ct,
+            object_id=str(document.pk),
+            object_repr=str(document),
+            user=request.user,
+            action='update',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            new_values={'action': 'content_saved'},
+            change_summary=f"Document content updated by {request.user.username}",
+        )
+
+        return Response({
+            'status': 'saved',
+            'document_id': document.document_id,
+            'updated_at': document.updated_at,
+        })
+
+    # ---------------------------------------------------------------
+    # COMMENTS ENDPOINTS
+    # ---------------------------------------------------------------
+
+    @action(detail=True, methods=['get', 'post'], url_path='comments')
+    def comments(self, request, pk=None):
+        """
+        GET: List all comments for this document (threaded, top-level only).
+        POST: Create a new comment or reply.
+        """
+        document = self.get_object()
+
+        if request.method == 'GET':
+            qs = DocumentComment.objects.filter(
+                document=document, parent__isnull=True
+            ).select_related('author', 'resolved_by').prefetch_related('replies__author')
+
+            status_filter = request.query_params.get('status')
+            if status_filter:
+                qs = qs.filter(status=status_filter)
+
+            serializer = DocumentCommentSerializer(qs, many=True)
+            return Response(serializer.data)
+
+        # POST — create comment
+        serializer = DocumentCommentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            author=request.user,
+            document=document,
+            document_version=document.version_string,
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/resolve')
+    def resolve_comment(self, request, pk=None, comment_id=None):
+        """Mark a comment as resolved."""
+        document = self.get_object()
+        comment = get_object_or_404(DocumentComment, pk=comment_id, document=document)
+
+        new_status = request.data.get('status', 'resolved')
+        if new_status not in ('resolved', 'wont_fix', 'open'):
+            return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+
+        comment.status = new_status
+        if new_status in ('resolved', 'wont_fix'):
+            comment.resolved_by = request.user
+            comment.resolved_at = timezone.now()
+        else:
+            comment.resolved_by = None
+            comment.resolved_at = None
+        comment.save()
+
+        return Response(DocumentCommentSerializer(comment).data)
+
+    # ---------------------------------------------------------------
+    # EXPORT ENDPOINTS
+    # ---------------------------------------------------------------
+
+    @action(detail=True, methods=['get'], url_path='export/(?P<fmt>pdf|docx|html)')
+    def export_document(self, request, pk=None, fmt='pdf'):
+        """
+        Export document content to PDF, DOCX, or HTML.
+        No MS Office license required — uses python-docx and weasyprint.
+        """
+        document = self.get_object()
+        html_content = document.content_html or '<p>No content</p>'
+
+        if fmt == 'html':
+            from django.http import HttpResponse
+            response = HttpResponse(html_content, content_type='text/html')
+            response['Content-Disposition'] = f'attachment; filename="{document.document_id}.html"'
+            return response
+
+        if fmt == 'docx':
+            try:
+                from docx import Document as DocxDocument
+                from docx.shared import Inches, Pt
+                from io import BytesIO
+                import re
+
+                doc = DocxDocument()
+                # Header
+                doc.add_heading(document.title, level=0)
+                doc.add_paragraph(
+                    f"Document ID: {document.document_id}  |  Version: {document.version_string}  |  "
+                    f"Status: {document.vault_state.title()}"
+                )
+                doc.add_paragraph('')
+
+                # Convert HTML to paragraphs (basic)
+                plain = re.sub(r'<[^>]+>', '\n', html_content)
+                for para in plain.split('\n'):
+                    para = para.strip()
+                    if para:
+                        doc.add_paragraph(para)
+
+                buffer = BytesIO()
+                doc.save(buffer)
+                buffer.seek(0)
+
+                from django.http import HttpResponse
+                response = HttpResponse(
+                    buffer.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                )
+                response['Content-Disposition'] = f'attachment; filename="{document.document_id}.docx"'
+                return response
+            except ImportError:
+                return Response(
+                    {'error': 'python-docx not installed. Run: pip install python-docx'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        if fmt == 'pdf':
+            return Response(
+                {'error': 'PDF export coming soon. Use HTML or DOCX for now.'},
+                status=status.HTTP_501_NOT_IMPLEMENTED
+            )
 
 
 class DocumentChangeOrderViewSet(viewsets.ModelViewSet):
