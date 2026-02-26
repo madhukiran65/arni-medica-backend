@@ -133,7 +133,17 @@ class ElectronicSignature(models.Model):
     21 CFR Part 11 electronic signature record.
     Requires password re-entry — not just a button click.
     Cryptographically binds the user to the signed content.
+    Supports signature invalidation for compliance with audit trail requirements.
     """
+    SIGNATURE_MEANING_CHOICES = [
+        ('approval', 'Approval'),
+        ('rejection', 'Rejection'),
+        ('review', 'Review'),
+        ('acknowledgment', 'Acknowledgment'),
+        ('verification', 'Verification'),
+        ('authoring', 'Authoring'),
+    ]
+
     REASON_CHOICES = [
         ('approval', 'Document Approval'),
         ('review', 'Document Review'),
@@ -154,10 +164,13 @@ class ElectronicSignature(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name='electronic_signatures'
     )
-    signed_at = models.DateTimeField(default=timezone.now)
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
 
     # Signature details
-    reason = models.CharField(max_length=30, choices=REASON_CHOICES)
+    signature_meaning = models.CharField(
+        max_length=30, choices=SIGNATURE_MEANING_CHOICES, default='approval'
+    )
+    reason = models.CharField(max_length=30, choices=REASON_CHOICES, blank=True, null=True)
     meaning = models.TextField(help_text="What the signer is attesting to")
 
     # Cryptographic binding
@@ -167,14 +180,40 @@ class ElectronicSignature(models.Model):
     # Context
     ip_address = models.GenericIPAddressField(null=True, blank=True)
 
+    # Signature validity tracking (21 CFR Part 11)
+    is_valid = models.BooleanField(default=True, db_index=True)
+    invalidated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='invalidated_signatures', null=True, blank=True
+    )
+    invalidated_at = models.DateTimeField(null=True, blank=True)
+    invalidation_reason = models.TextField(blank=True, null=True)
+
     class Meta:
-        ordering = ['-signed_at']
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['signer', 'timestamp']),
+            models.Index(fields=['is_valid']),
+        ]
 
     def __str__(self):
-        return f"Signature by {self.signer} on {self.signed_at}"
+        status = "Valid" if self.is_valid else "Invalidated"
+        return f"{status} signature by {self.signer} on {self.timestamp}"
+
+    def invalidate(self, user, reason):
+        """Mark signature as invalid (immutable audit trail)."""
+        if not self.is_valid:
+            raise ValueError("Signature is already invalidated")
+        self.is_valid = False
+        self.invalidated_by = user
+        self.invalidated_at = timezone.now()
+        self.invalidation_reason = reason
+        self.save(update_fields=['is_valid', 'invalidated_by', 'invalidated_at', 'invalidation_reason'])
 
     @staticmethod
-    def create_signature(user, content_type, object_id, content_str, reason, meaning, ip_address=None):
+    def create_signature(user, content_type, object_id, content_str, signature_meaning,
+                        meaning, reason=None, ip_address=None):
         """Create a verified electronic signature."""
         content_hash = hashlib.sha256(content_str.encode()).hexdigest()
         timestamp = timezone.now()
@@ -185,7 +224,8 @@ class ElectronicSignature(models.Model):
             content_type=content_type,
             object_id=str(object_id),
             signer=user,
-            signed_at=timestamp,
+            timestamp=timestamp,
+            signature_meaning=signature_meaning,
             reason=reason,
             meaning=meaning,
             content_hash=content_hash,

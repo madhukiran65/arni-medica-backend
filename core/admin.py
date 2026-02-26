@@ -40,17 +40,18 @@ class AttachmentAdmin(admin.ModelAdmin):
 class ElectronicSignatureAdmin(admin.ModelAdmin):
     """Read-only admin for electronic signatures (21 CFR Part 11)"""
     list_display = [
-        'signer', 'reason', 'signed_at', 'content_type',
-        'object_id', 'ip_address',
+        'signer', 'signature_meaning', 'timestamp', 'is_valid',
+        'content_type', 'object_id', 'ip_address',
     ]
-    list_filter = ['reason', 'signed_at', 'content_type']
-    search_fields = ['signer__username', 'meaning']
+    list_filter = ['signature_meaning', 'timestamp', 'is_valid', 'content_type']
+    search_fields = ['signer__username', 'meaning', 'invalidation_reason']
     readonly_fields = [
-        'content_type', 'object_id', 'signer', 'signed_at',
-        'reason', 'meaning', 'content_hash', 'signature_hash', 'ip_address',
+        'content_type', 'object_id', 'signer', 'timestamp',
+        'signature_meaning', 'reason', 'meaning', 'content_hash', 'signature_hash',
+        'ip_address', 'is_valid', 'invalidated_by', 'invalidated_at', 'invalidation_reason',
     ]
-    date_hierarchy = 'signed_at'
-    ordering = ['-signed_at']
+    date_hierarchy = 'timestamp'
+    ordering = ['-timestamp']
 
     def has_add_permission(self, request):
         return False  # Signatures are system-generated
