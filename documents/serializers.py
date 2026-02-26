@@ -547,10 +547,13 @@ class CheckoutActionSerializer(serializers.Serializer):
     
     checkout_reason = serializers.CharField(
         max_length=500,
-        required=True
+        required=False,
+        default=''
     )
     expected_checkin_date = serializers.DateTimeField(
-        required=True
+        required=False,
+        allow_null=True,
+        default=None
     )
 
 
