@@ -29,8 +29,30 @@ def _db_check(request):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v12-docs-enriched'
+    result['build_marker'] = 'v13-enriched-workflows-forms'
     return JsonResponse(result)
+
+
+def _run_mgmt(request):
+    """Run any management command. Usage: /api/run-mgmt/?cmd=enrich_demo_data"""
+    import subprocess
+    command = request.GET.get('cmd', '')
+    if not command:
+        return JsonResponse({'error': 'Missing ?cmd= parameter'})
+    allowed = ['enrich_demo_data', 'seed_form_templates', 'seed_demo_data', 'seed_eqms', 'seed_data']
+    if command not in allowed:
+        return JsonResponse({'error': f'Command not allowed. Allowed: {allowed}'})
+    cmd = ['python', 'manage.py', command]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd='/app')
+        return JsonResponse({
+            'command': command,
+            'returncode': proc.returncode,
+            'stdout': proc.stdout[-5000:] if proc.stdout else '',
+            'stderr': proc.stderr[-5000:] if proc.stderr else '',
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)})
 
 
 def _run_seed(request):
@@ -110,6 +132,7 @@ urlpatterns = [
     path('api/db-check/', lambda r: _db_check(r)),
     path('api/run-migrate/', lambda r: _run_migrate(r)),
     path('api/run-seed/', lambda r: _run_seed(r)),
+    path('api/run-mgmt/', lambda r: _run_mgmt(r)),
     # API docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
