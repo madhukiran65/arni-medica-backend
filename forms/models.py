@@ -6,7 +6,7 @@ from users.models import Department
 
 class FormTemplate(AuditedModel):
     """Form template for audit, investigation, deviation tracking, etc."""
-    
+
     TEMPLATE_TYPE_CHOICES = [
         ('audit_checklist', 'Audit Checklist'),
         ('investigation_form', 'Investigation Form'),
@@ -16,7 +16,7 @@ class FormTemplate(AuditedModel):
         ('review_form', 'Review Form'),
         ('custom', 'Custom'),
     ]
-    
+
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
     template_type = models.CharField(max_length=50, choices=TEMPLATE_TYPE_CHOICES)
@@ -31,7 +31,7 @@ class FormTemplate(AuditedModel):
         related_name='form_templates'
     )
     category = models.CharField(max_length=100, blank=True)
-    
+
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Form Template'
@@ -40,14 +40,14 @@ class FormTemplate(AuditedModel):
             models.Index(fields=['template_type', 'is_published']),
             models.Index(fields=['department', 'is_active']),
         ]
-    
+
     def __str__(self):
         return f"{self.name} (v{self.version})"
 
 
 class FormSection(models.Model):
     """Section within a form template for organizing questions."""
-    
+
     template = models.ForeignKey(
         FormTemplate,
         on_delete=models.CASCADE,
@@ -58,7 +58,7 @@ class FormSection(models.Model):
     sequence = models.IntegerField()
     is_repeatable = models.BooleanField(default=False)
     conditions = models.JSONField(blank=True, null=True, help_text='Conditional show/hide logic')
-    
+
     class Meta:
         ordering = ['sequence']
         unique_together = [['template', 'sequence']]
@@ -67,41 +67,39 @@ class FormSection(models.Model):
         indexes = [
             models.Index(fields=['template', 'sequence']),
         ]
-    
+
     def __str__(self):
         return f"{self.template.name} - {self.title}"
 
 
 class FormQuestion(models.Model):
     """Individual question within a form section."""
-    
+
     QUESTION_TYPE_CHOICES = [
         ('text', 'Short Text'),
         ('textarea', 'Long Text'),
         ('number', 'Number'),
-        ('decimal', 'Decimal'),
         ('date', 'Date'),
-        ('datetime', 'Date & Time'),
         ('time', 'Time'),
-        ('email', 'Email'),
-        ('url', 'URL'),
-        ('phone', 'Phone'),
+        ('datetime', 'Date & Time'),
         ('checkbox', 'Checkbox'),
         ('radio', 'Radio Button'),
         ('dropdown', 'Dropdown'),
         ('multi_select', 'Multi-Select'),
         ('file_upload', 'File Upload'),
-        ('image_upload', 'Image Upload'),
         ('signature', 'Signature'),
         ('rating', 'Rating'),
-        ('scale', 'Scale'),
         ('matrix', 'Matrix'),
         ('formula', 'Formula'),
         ('conditional', 'Conditional'),
-        ('yes_no', 'Yes/No'),
-        ('pass_fail', 'Pass/Fail'),
+        ('section_break', 'Section Break'),
+        ('instruction', 'Instruction'),
+        ('email', 'Email'),
+        ('phone', 'Phone'),
+        ('url', 'URL'),
+        ('calculated', 'Calculated'),
     ]
-    
+
     section = models.ForeignKey(
         FormSection,
         on_delete=models.CASCADE,
@@ -126,7 +124,7 @@ class FormQuestion(models.Model):
     placeholder = models.CharField(max_length=255, blank=True)
     scoring_weight = models.IntegerField(default=0, help_text='Weight for scored forms')
     conditions = models.JSONField(blank=True, null=True, help_text='Conditional visibility logic')
-    
+
     class Meta:
         ordering = ['sequence']
         verbose_name = 'Form Question'
@@ -135,21 +133,70 @@ class FormQuestion(models.Model):
             models.Index(fields=['section', 'sequence']),
             models.Index(fields=['question_type']),
         ]
-    
+
     def __str__(self):
         return f"Q{self.sequence}: {self.question_text[:50]}"
 
 
+class ConditionalRule(models.Model):
+    """Rules for conditional visibility and behavior of form questions"""
+
+    CONDITION_TYPE_CHOICES = [
+        ('equals', 'Equals'),
+        ('not_equals', 'Not Equals'),
+        ('contains', 'Contains'),
+        ('greater_than', 'Greater Than'),
+        ('less_than', 'Less Than'),
+    ]
+
+    ACTION_CHOICES = [
+        ('show', 'Show'),
+        ('hide', 'Hide'),
+        ('require', 'Make Required'),
+    ]
+
+    form_question = models.ForeignKey(
+        FormQuestion,
+        on_delete=models.CASCADE,
+        related_name='conditional_rules'
+    )
+    condition_type = models.CharField(
+        max_length=50,
+        choices=CONDITION_TYPE_CHOICES
+    )
+    condition_value = models.CharField(max_length=500)
+    target_question = models.ForeignKey(
+        FormQuestion,
+        on_delete=models.CASCADE,
+        related_name='conditions_targeting_this'
+    )
+    action = models.CharField(
+        max_length=50,
+        choices=ACTION_CHOICES
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['form_question__sequence']
+        verbose_name = 'Conditional Rule'
+        verbose_name_plural = 'Conditional Rules'
+
+    def __str__(self):
+        return f"If {self.form_question.question_text} {self.condition_type} '{self.condition_value}' then {self.action} Q{self.target_question.sequence}"
+
+
 class FormInstance(AuditedModel):
     """Completed form instance tied to a context (audit, deviation, etc)."""
-    
+
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
         ('reviewed', 'Reviewed'),
     ]
-    
+
     template = models.ForeignKey(
         FormTemplate,
         on_delete=models.PROTECT,
@@ -171,7 +218,7 @@ class FormInstance(AuditedModel):
     context_id = models.CharField(max_length=100, blank=True)
     score = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_possible_score = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
+
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Form Instance'
@@ -181,14 +228,14 @@ class FormInstance(AuditedModel):
             models.Index(fields=['context_type', 'context_id']),
             models.Index(fields=['completed_by', 'created_at']),
         ]
-    
+
     def __str__(self):
         return f"{self.template.name} - {self.get_status_display()}"
 
 
 class FormResponse(models.Model):
     """Individual response/answer to a form question."""
-    
+
     instance = models.ForeignKey(
         FormInstance,
         on_delete=models.CASCADE,
@@ -205,7 +252,7 @@ class FormResponse(models.Model):
     response_json = models.JSONField(blank=True, null=True, help_text='For complex responses: multi_select, matrix')
     response_file = models.FileField(upload_to='form_responses/%Y/%m/', null=True, blank=True)
     answered_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         unique_together = [['instance', 'question']]
         verbose_name = 'Form Response'
@@ -213,6 +260,6 @@ class FormResponse(models.Model):
         indexes = [
             models.Index(fields=['instance', 'question']),
         ]
-    
+
     def __str__(self):
         return f"Response to {self.question.question_text[:30]}"

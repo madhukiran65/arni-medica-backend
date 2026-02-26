@@ -5,11 +5,41 @@ from .models import (
     FormQuestion,
     FormInstance,
     FormResponse,
+    ConditionalRule,
 )
+
+
+class ConditionalRuleSerializer(serializers.ModelSerializer):
+    """Serializer for conditional rules."""
+    condition_type_display = serializers.CharField(source='get_condition_type_display', read_only=True)
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    form_question_text = serializers.CharField(source='form_question.question_text', read_only=True)
+    target_question_text = serializers.CharField(source='target_question.question_text', read_only=True)
+
+    class Meta:
+        model = ConditionalRule
+        fields = [
+            'id',
+            'form_question',
+            'form_question_text',
+            'condition_type',
+            'condition_type_display',
+            'condition_value',
+            'target_question',
+            'target_question_text',
+            'action',
+            'action_display',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class FormQuestionSerializer(serializers.ModelSerializer):
     """Serializer for form questions."""
+    conditional_rules = ConditionalRuleSerializer(many=True, read_only=True)
+    question_type_display = serializers.CharField(source='get_question_type_display', read_only=True)
 
     class Meta:
         model = FormQuestion
@@ -18,6 +48,7 @@ class FormQuestionSerializer(serializers.ModelSerializer):
             'section',
             'question_text',
             'question_type',
+            'question_type_display',
             'is_required',
             'sequence',
             'help_text',
@@ -27,6 +58,7 @@ class FormQuestionSerializer(serializers.ModelSerializer):
             'placeholder',
             'scoring_weight',
             'conditions',
+            'conditional_rules',
         ]
         read_only_fields = ['id']
 
@@ -77,6 +109,7 @@ class FormTemplateDetailSerializer(serializers.ModelSerializer):
         read_only=True
     )
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    template_type_display = serializers.CharField(source='get_template_type_display', read_only=True)
 
     class Meta:
         model = FormTemplate
@@ -85,6 +118,7 @@ class FormTemplateDetailSerializer(serializers.ModelSerializer):
             'name',
             'description',
             'template_type',
+            'template_type_display',
             'version',
             'is_published',
             'is_active',
@@ -107,6 +141,7 @@ class FormTemplateDetailSerializer(serializers.ModelSerializer):
 class FormResponseSerializer(serializers.ModelSerializer):
     """Serializer for form responses."""
     question_text = serializers.CharField(source='question.question_text', read_only=True)
+    question_type = serializers.CharField(source='question.question_type', read_only=True)
 
     class Meta:
         model = FormResponse
@@ -115,6 +150,7 @@ class FormResponseSerializer(serializers.ModelSerializer):
             'instance',
             'question',
             'question_text',
+            'question_type',
             'response_text',
             'response_number',
             'response_boolean',
@@ -122,7 +158,7 @@ class FormResponseSerializer(serializers.ModelSerializer):
             'response_file',
             'answered_at',
         ]
-        read_only_fields = ['id', 'answered_at', 'question_text']
+        read_only_fields = ['id', 'answered_at', 'question_text', 'question_type']
 
 
 class FormInstanceListSerializer(serializers.ModelSerializer):
@@ -133,6 +169,7 @@ class FormInstanceListSerializer(serializers.ModelSerializer):
         read_only=True,
         allow_null=True
     )
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = FormInstance
@@ -141,10 +178,11 @@ class FormInstanceListSerializer(serializers.ModelSerializer):
             'template_name',
             'completed_by_username',
             'status',
+            'status_display',
             'completed_at',
             'score',
         ]
-        read_only_fields = ['id', 'template_name', 'completed_by_username']
+        read_only_fields = ['id', 'template_name', 'completed_by_username', 'status_display']
 
 
 class FormInstanceDetailSerializer(serializers.ModelSerializer):
@@ -159,6 +197,7 @@ class FormInstanceDetailSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True
     )
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = FormInstance
@@ -169,6 +208,7 @@ class FormInstanceDetailSerializer(serializers.ModelSerializer):
             'completed_by',
             'completed_by_username',
             'status',
+            'status_display',
             'score',
             'total_possible_score',
             'context_type',
@@ -184,24 +224,24 @@ class FormInstanceDetailSerializer(serializers.ModelSerializer):
             'updated_at',
             'template_name',
             'completed_by_username',
+            'status_display',
         ]
 
 
 class SubmitFormSerializer(serializers.Serializer):
     """Serializer for submitting form responses."""
-    action = serializers.ListField(
+    responses = serializers.ListField(
         child=serializers.DictField(
             child=serializers.JSONField(),
-            help_text='Response data with question_id and response fields'
         ),
         help_text='List of response dictionaries with question_id and response values'
     )
 
-    def validate_action(self, value):
-        """Validate that each action item has required fields."""
+    def validate_responses(self, value):
+        """Validate that each response has required fields."""
         for item in value:
             if 'question_id' not in item:
                 raise serializers.ValidationError(
-                    'Each action item must have a question_id'
+                    'Each response must have a question_id'
                 )
         return value

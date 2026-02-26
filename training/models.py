@@ -139,6 +139,7 @@ class TrainingCourse(AuditedModel):
         blank=True,
         related_name='training_courses_assigned'
     )
+    auto_assign_on_role_change = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['title']
@@ -167,7 +168,40 @@ class TrainingCourse(AuditedModel):
 
 
 # ============================================================================
-# 3. TRAINING PLAN - Auto-assign bundles
+# 3. TRAINING COMPETENCY - Add competency tracking
+# ============================================================================
+class TrainingCompetency(models.Model):
+    """
+    Competencies required for specific job functions or courses
+    """
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    course = models.ForeignKey(
+        TrainingCourse,
+        on_delete=models.CASCADE,
+        related_name='competencies'
+    )
+    is_mandatory = models.BooleanField(default=True)
+    renewal_period_months = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)]
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Training Competency'
+        verbose_name_plural = 'Training Competencies'
+
+    def __str__(self):
+        return self.name
+
+
+# ============================================================================
+# 4. TRAINING PLAN - Auto-assign bundles
 # ============================================================================
 class TrainingPlan(AuditedModel):
     """
@@ -193,7 +227,7 @@ class TrainingPlan(AuditedModel):
 
 
 # ============================================================================
-# 4. TRAINING PLAN COURSE - Through table
+# 5. TRAINING PLAN COURSE - Through table
 # ============================================================================
 class TrainingPlanCourse(models.Model):
     """
@@ -226,7 +260,7 @@ class TrainingPlanCourse(models.Model):
 
 
 # ============================================================================
-# 5. TRAINING ASSIGNMENT - Enhanced version
+# 6. TRAINING ASSIGNMENT - Enhanced version
 # ============================================================================
 class TrainingAssignment(AuditedModel):
     """
@@ -340,13 +374,20 @@ class TrainingAssignment(AuditedModel):
 
 
 # ============================================================================
-# 6. TRAINING ASSESSMENT - Quiz/exam definition
+# 7. TRAINING ASSESSMENT - Quiz/exam definition
 # ============================================================================
 class TrainingAssessment(AuditedModel):
     """
     Assessment/quiz definition for a training course.
     One-to-one relationship with TrainingCourse.
     """
+    ASSESSMENT_TYPE_CHOICES = (
+        ('quiz', 'Quiz'),
+        ('exam', 'Exam'),
+        ('survey', 'Survey'),
+        ('practical', 'Practical'),
+    )
+
     course = models.OneToOneField(
         TrainingCourse,
         on_delete=models.CASCADE,
@@ -354,6 +395,11 @@ class TrainingAssessment(AuditedModel):
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    assessment_type = models.CharField(
+        max_length=50,
+        choices=ASSESSMENT_TYPE_CHOICES,
+        default='quiz'
+    )
     passing_score = models.IntegerField(
         default=80,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
@@ -380,7 +426,7 @@ class TrainingAssessment(AuditedModel):
 
 
 # ============================================================================
-# 7. ASSESSMENT QUESTION - 6 question types
+# 8. ASSESSMENT QUESTION - 6 question types
 # ============================================================================
 class AssessmentQuestion(AuditedModel):
     """
@@ -426,7 +472,7 @@ class AssessmentQuestion(AuditedModel):
 
 
 # ============================================================================
-# 8. ASSESSMENT ATTEMPT - User's attempt at assessment
+# 9. ASSESSMENT ATTEMPT - User's attempt at assessment
 # ============================================================================
 class AssessmentAttempt(AuditedModel):
     """
@@ -465,7 +511,7 @@ class AssessmentAttempt(AuditedModel):
 
 
 # ============================================================================
-# 9. ASSESSMENT RESPONSE - Individual answers
+# 10. ASSESSMENT RESPONSE - Individual answers
 # ============================================================================
 class AssessmentResponse(AuditedModel):
     """
@@ -497,7 +543,7 @@ class AssessmentResponse(AuditedModel):
 
 
 # ============================================================================
-# 10. TRAINING COMPLIANCE RECORD - Compliance tracking
+# 11. TRAINING COMPLIANCE RECORD - Compliance tracking
 # ============================================================================
 class TrainingComplianceRecord(AuditedModel):
     """

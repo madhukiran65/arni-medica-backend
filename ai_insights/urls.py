@@ -11,6 +11,9 @@ from .views import (
     QualityScoreView,
     ComplianceView,
     PredictionsView,
+    EnhancedDashboardView,
+    AIRecommendationsView,
+    QualityTrendsView,
 )
 
 router = DefaultRouter()
@@ -20,11 +23,13 @@ urlpatterns = [
     path('', include(router.urls)),
     # Dashboard endpoints
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('enhanced-dashboard/', EnhancedDashboardView.as_view(), name='enhanced-dashboard'),
     path('kpis/', KPIView.as_view(), name='kpis'),
     # Trend endpoints
     path('trends/capa/', CAPATrendsView.as_view(), name='capa-trends'),
     path('trends/complaints/', ComplaintTrendsView.as_view(), name='complaint-trends'),
     path('trends/deviations/', DeviationTrendsView.as_view(), name='deviation-trends'),
+    path('trends/quality/', QualityTrendsView.as_view(), name='quality-trends'),
     # Risk and Quality endpoints
     path('risk-matrix/', RiskMatrixView.as_view(), name='risk-matrix'),
     path('quality-score/', QualityScoreView.as_view(), name='quality-score'),
@@ -32,4 +37,6 @@ urlpatterns = [
     path('compliance/', ComplianceView.as_view(), name='compliance'),
     # Predictions endpoint
     path('predictions/', PredictionsView.as_view(), name='predictions'),
+    # AI Recommendations endpoint
+    path('recommendations/', AIRecommendationsView.as_view(), name='recommendations'),
 ]

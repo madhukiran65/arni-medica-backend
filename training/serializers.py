@@ -11,6 +11,7 @@ from .models import (
     TrainingPlanCourse,
     TrainingAssignment,
     TrainingAssessment,
+    TrainingCompetency,
     AssessmentQuestion,
     AssessmentAttempt,
     AssessmentResponse,
@@ -54,6 +55,23 @@ class JobFunctionSerializer(serializers.ModelSerializer):
 
 
 # ============================================================================
+# TRAINING COMPETENCY SERIALIZERS
+# ============================================================================
+class TrainingCompetencySerializer(serializers.ModelSerializer):
+    """Training competency details"""
+    course_title = serializers.CharField(source='course.title', read_only=True)
+
+    class Meta:
+        model = TrainingCompetency
+        fields = [
+            'id', 'name', 'description', 'course', 'course_title',
+            'is_mandatory', 'renewal_period_months', 'is_active',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+# ============================================================================
 # TRAINING COURSE SERIALIZERS
 # ============================================================================
 class TrainingCourseListSerializer(serializers.ModelSerializer):
@@ -86,6 +104,7 @@ class TrainingCourseDetailSerializer(serializers.ModelSerializer):
     assignments_count = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     course_type_display = serializers.CharField(source='get_course_type_display', read_only=True)
+    competencies = TrainingCompetencySerializer(many=True, read_only=True)
 
     class Meta:
         model = TrainingCourse
@@ -96,7 +115,8 @@ class TrainingCourseDetailSerializer(serializers.ModelSerializer):
             'max_attempts', 'scorm_package_url', 'course_material', 'version',
             'effective_date', 'expiry_date', 'regulatory_requirement', 'trainer',
             'trainer_name', 'department', 'department_name', 'prerequisites',
-            'applicable_job_functions', 'dependent_courses_count', 'assignments_count',
+            'applicable_job_functions', 'auto_assign_on_role_change', 'competencies',
+            'dependent_courses_count', 'assignments_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -283,14 +303,15 @@ class TrainingAssessmentSerializer(serializers.ModelSerializer):
     questions = AssessmentQuestionSerializer(many=True, read_only=True)
     questions_count = serializers.SerializerMethodField()
     total_points = serializers.SerializerMethodField()
+    assessment_type_display = serializers.CharField(source='get_assessment_type_display', read_only=True)
 
     class Meta:
         model = TrainingAssessment
         fields = [
-            'id', 'course', 'course_title', 'title', 'description', 'passing_score',
-            'time_limit_minutes', 'max_attempts', 'randomize_questions',
-            'show_correct_answers', 'is_active', 'questions', 'questions_count',
-            'total_points', 'created_at', 'updated_at'
+            'id', 'course', 'course_title', 'title', 'description', 'assessment_type',
+            'assessment_type_display', 'passing_score', 'time_limit_minutes', 'max_attempts',
+            'randomize_questions', 'show_correct_answers', 'is_active', 'questions',
+            'questions_count', 'total_points', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

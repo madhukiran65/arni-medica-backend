@@ -6,12 +6,15 @@ from .views import (
     TrainingPlanViewSet,
     TrainingAssignmentViewSet,
     TrainingAssessmentViewSet,
+    TrainingCompetencyViewSet,
     ComplianceDashboardViewSet,
-    AutoAssignView
+    AutoAssignView,
+    TrainingDashboardView
 )
 
 router = DefaultRouter()
 router.register(r'job-functions', JobFunctionViewSet, basename='job-function')
+router.register(r'competencies', TrainingCompetencyViewSet, basename='training-competency')
 router.register(r'courses', TrainingCourseViewSet, basename='training-course')
 router.register(r'plans', TrainingPlanViewSet, basename='training-plan')
 router.register(r'assignments', TrainingAssignmentViewSet, basename='training-assignment')
@@ -21,4 +24,5 @@ router.register(r'compliance', ComplianceDashboardViewSet, basename='compliance-
 urlpatterns = [
     path('', include(router.urls)),
     path('auto-assign/', AutoAssignView.as_view(), name='auto-assign'),
+    path('dashboard/', TrainingDashboardView.as_view(), name='training-dashboard'),
 ]
