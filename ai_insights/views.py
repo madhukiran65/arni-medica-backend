@@ -22,7 +22,7 @@ from deviations.models import Deviation
 from complaints.models import Complaint
 from change_controls.models import ChangeControl
 from suppliers.models import Supplier
-from training.models import TrainingCourse
+from training.models import TrainingCourse, TrainingAssignment
 from audit_mgmt.models import AuditPlan
 
 
@@ -236,9 +236,9 @@ class EnhancedDashboardView(views.APIView):
             target_closure_date__lt=now
         ).count()
 
-        overdue_training = TrainingCourse.objects.filter(
-            status='scheduled',
-            scheduled_date__lt=now
+        overdue_training = TrainingAssignment.objects.filter(
+            status='assigned',
+            due_date__lt=now
         ).count()
 
         overdue_change_controls = ChangeControl.objects.filter(
@@ -430,9 +430,9 @@ class AIRecommendationsView(views.APIView):
             })
 
         # Check for training compliance
-        overdue_training = TrainingCourse.objects.filter(
-            status='scheduled',
-            scheduled_date__lt=now
+        overdue_training = TrainingAssignment.objects.filter(
+            status='assigned',
+            due_date__lt=now
         ).count()
         if overdue_training > 0:
             recommendations.append({

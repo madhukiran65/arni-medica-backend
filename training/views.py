@@ -94,7 +94,7 @@ class TrainingCourseViewSet(viewsets.ModelViewSet):
     queryset = TrainingCourse.objects.all()
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['course_type', 'status', 'department', 'has_assessment', 'is_mandatory']
+    filterset_fields = ['course_type', 'status', 'department', 'has_assessment']
     search_fields = ['title', 'description', 'course_id']
     ordering_fields = ['title', 'created_at', 'duration_hours']
     ordering = ['-created_at']
