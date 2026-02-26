@@ -265,7 +265,7 @@ def health_check(request):
         'status': overall_status,
         'database': database_status,
         'version': '1.0.0',
-        'app': 'Arni Medica eQMS',
+        'app': 'Arni eQMS',
         'debug': settings.DEBUG,
     })
 

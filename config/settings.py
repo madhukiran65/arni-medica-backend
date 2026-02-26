@@ -167,7 +167,7 @@ SIMPLE_JWT = {
 
 # API Documentation
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Arni Medica AI-EQMS API',
+    'TITLE': 'Arni eQMS API',
     'DESCRIPTION': 'Enterprise Quality Management System for IVD Medical Devices',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
@@ -237,7 +237,7 @@ EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@arni-medica.com')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@arnieqms.com')
 
 # Frontend URL for email links
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')

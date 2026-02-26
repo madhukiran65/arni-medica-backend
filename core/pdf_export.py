@@ -65,7 +65,7 @@ def _get_header_elements(report_type):
         spaceAfter=6,
         fontName='Helvetica-Bold'
     )
-    elements.append(Paragraph("Arni Medica Diagnostics", header_style))
+    elements.append(Paragraph("Arni eQMS", header_style))
 
     # Report type
     subheader_style = ParagraphStyle(

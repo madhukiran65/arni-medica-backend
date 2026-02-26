@@ -1,5 +1,5 @@
 """
-Email notification service for Arni Medica AI-EQMS
+Email notification service for Arni eQMS
 Handles email notifications for approvals, CAPAs, deviations, and reminders
 """
 import logging
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class NotificationService:
-    """Service for sending professional email notifications with Arni Medica branding."""
+    """Service for sending professional email notifications with Arni eQMS branding."""
 
     FRONTEND_BASE_URL = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'http://localhost:3000'
 
