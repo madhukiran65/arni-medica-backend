@@ -311,6 +311,28 @@ class WorkflowService:
             ),
         )
 
+        # 10b. Auto-set effective_date and next_review_date on release
+        if to_stage.slug == 'released':
+            record = workflow_record.content_object
+            if hasattr(record, 'effective_date') and hasattr(record, 'vault_state'):
+                from datetime import date
+                from dateutil.relativedelta import relativedelta
+                today = date.today()
+                record.effective_date = today
+                record.vault_state = 'released'
+                record.released_date = timezone.now()
+                review_months = getattr(record, 'review_period_months', 24) or 24
+                record.next_review_date = today + relativedelta(months=review_months)
+                record.save(update_fields=[
+                    'effective_date', 'next_review_date',
+                    'vault_state', 'released_date',
+                ])
+                logger.info(
+                    f"Auto-set release fields for {record}: "
+                    f"effective={record.effective_date}, "
+                    f"next_review={record.next_review_date}"
+                )
+
         # 11. Create approval requests for new stage if needed
         if to_stage.requires_approval:
             WorkflowService._create_approval_requests(workflow_record, to_stage)
