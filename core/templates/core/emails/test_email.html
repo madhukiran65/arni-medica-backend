@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Configuration Test</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+        .email-container { max-width: 600px; margin: 20px auto; background-color: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .email-header { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 40px 20px; text-align: center; }
+        .email-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+        .email-header .logo { font-size: 14px; margin-top: 10px; opacity: 0.9; }
+        .email-body { padding: 30px; color: #333; }
+        .success-badge { display: inline-block; padding: 10px 20px; background-color: #d4edda; color: #155724; border-radius: 20px; font-weight: 600; margin: 10px 0; }
+        .content-section { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-left: 4px solid #28a745; border-radius: 4px; }
+        .content-section .label { font-weight: 600; color: #155724; }
+        .email-footer { background-color: #f5f5f5; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>✓ Email Configuration Test</h1>
+            <div class="logo">Arni eQMS</div>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{ recipient_name }},</p>
+
+            <div style="text-align: center;">
+                <span class="success-badge">Email is working correctly!</span>
+            </div>
+
+            <p>This is a test email from your Arni eQMS system. If you received this email, your email notification system is properly configured.</p>
+
+            <div class="content-section">
+                <div><span class="label">System:</span> Arni eQMS</div>
+                <div><span class="label">Status:</span> Email service active</div>
+                <div><span class="label">Dashboard:</span> <a href="{{ frontend_url }}">{{ frontend_url }}</a></div>
+            </div>
+
+            <p style="color: #666; font-size: 14px;">
+                You will now receive notifications for document approvals, workflow transitions, CAPA assignments, and other quality events.
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p>Arni eQMS | Enterprise Quality Management System</p>
+            <p>© 2026 Arni eQMS. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

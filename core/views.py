@@ -246,6 +246,40 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({'unread_count': count})
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_test_email(request):
+    """
+    Send a test email to verify SMTP configuration.
+    POST /api/audit-logs/test-email/
+    Body: { "email": "recipient@example.com" }  (optional, defaults to current user's email)
+    """
+    from core.notifications import NotificationService
+
+    recipient_email = request.data.get('email', request.user.email)
+    recipient_name = request.user.get_full_name() or request.user.username
+
+    if not recipient_email:
+        return Response(
+            {'error': 'No email address provided and current user has no email set.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    success = NotificationService.send_test_email(recipient_email, recipient_name)
+
+    if success:
+        return Response({
+            'status': 'sent',
+            'message': f'Test email sent successfully to {recipient_email}',
+            'email_backend': settings.EMAIL_BACKEND,
+        })
+    else:
+        return Response(
+            {'status': 'failed', 'message': f'Failed to send test email to {recipient_email}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_check(request):

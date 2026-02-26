@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Stage Change</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+        .email-container { max-width: 600px; margin: 20px auto; background-color: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .email-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 40px 20px; text-align: center; }
+        .email-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+        .email-header .logo { font-size: 14px; margin-top: 10px; opacity: 0.9; }
+        .email-body { padding: 30px; color: #333; }
+        .email-body h2 { color: #1e3c72; margin-top: 0; }
+        .content-section { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-left: 4px solid #2a5298; border-radius: 4px; }
+        .content-section .label { font-weight: 600; color: #1e3c72; }
+        .content-section .value { margin-left: 10px; color: #555; }
+        .stage-flow { text-align: center; margin: 20px 0; padding: 15px; }
+        .stage-badge { display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; }
+        .stage-from { background-color: #fef3cd; color: #856404; }
+        .stage-arrow { display: inline-block; margin: 0 12px; font-size: 20px; color: #2a5298; }
+        .stage-to { background-color: #d4edda; color: #155724; }
+        .cta-button { display: inline-block; padding: 12px 30px; margin: 20px 0; background-color: #2a5298; color: white; text-decoration: none; border-radius: 4px; font-weight: 600; }
+        .email-footer { background-color: #f5f5f5; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #ddd; }
+        .divider { margin: 20px 0; border: none; border-top: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>{{ record_type }} Stage Changed</h1>
+            <div class="logo">Arni eQMS</div>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{ recipient_name }},</p>
+
+            <p>The following {{ record_type|lower }} has been transitioned to a new stage:</p>
+
+            <div class="content-section">
+                <div><span class="label">{{ record_type }}:</span><span class="value">{{ record_title }}</span></div>
+                <div><span class="label">Transitioned by:</span><span class="value">{{ transitioned_by }}</span></div>
+            </div>
+
+            <div class="stage-flow">
+                <span class="stage-badge stage-from">{{ from_stage }}</span>
+                <span class="stage-arrow">→</span>
+                <span class="stage-badge stage-to">{{ to_stage }}</span>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{ record_url }}" class="cta-button">View {{ record_type }}</a>
+            </div>
+
+            <hr class="divider">
+
+            <p style="color: #666; font-size: 14px;">
+                <strong>Note:</strong> This is an automated notification from the Arni eQMS system.
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p>Arni eQMS | Enterprise Quality Management System</p>
+            <p>© 2026 Arni eQMS. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

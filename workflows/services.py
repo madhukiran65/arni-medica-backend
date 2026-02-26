@@ -315,6 +315,22 @@ class WorkflowService:
         if to_stage.requires_approval:
             WorkflowService._create_approval_requests(workflow_record, to_stage)
 
+        # 12. Send notification for workflow transition
+        try:
+            from core.notifications import NotificationService
+            record = workflow_record.content_object
+            # Determine record type from workflow model_type
+            record_type = workflow.model_type or 'document'
+            NotificationService.send_workflow_transition(
+                record=record,
+                from_stage=from_stage.name,
+                to_stage=to_stage.name,
+                transitioned_by=user,
+                record_type=record_type,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send transition notification: {e}")
+
         logger.info(
             f"Transition: {workflow_record.content_object} "
             f"'{from_stage.name}' → '{to_stage.name}' by {user}"

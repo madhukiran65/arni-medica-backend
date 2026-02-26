@@ -622,9 +622,35 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            old_stage = document.lifecycle_stage
             document.lifecycle_stage = serializer.validated_data['target_stage']
             document.updated_by = request.user
             document.save()
+
+            # Send notification for lifecycle transition
+            try:
+                from core.notifications import NotificationService
+                NotificationService.send_workflow_transition(
+                    record=document,
+                    from_stage=old_stage or 'Draft',
+                    to_stage=document.lifecycle_stage,
+                    transitioned_by=request.user,
+                    record_type='document',
+                )
+                # If transitioning to InReview, notify approvers
+                if document.lifecycle_stage in ('InReview', 'in_review', 'SignOff', 'sign_off'):
+                    approvers = [a.approver for a in document.approvers.filter(
+                        approval_status='pending'
+                    ) if a.approver]
+                    if approvers:
+                        NotificationService.send_approval_request(
+                            document=document,
+                            approvers=approvers,
+                            requester=request.user,
+                        )
+            except Exception as notify_err:
+                import logging
+                logging.getLogger(__name__).warning(f"Notification failed: {notify_err}")
 
             return Response(
                 DocumentDetailSerializer(document).data,
@@ -665,6 +691,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
                     'comments': request.data.get('comment', '')
                 }
             )
+
+            # Send notification to document owner about approval
+            try:
+                from core.notifications import NotificationService
+                NotificationService.send_approval_complete(
+                    document=document,
+                    approver=request.user,
+                    decision='approved',
+                )
+            except Exception as notify_err:
+                import logging
+                logging.getLogger(__name__).warning(f"Approval notification failed: {notify_err}")
 
             return Response(
                 DocumentApproverSerializer(approver).data,
