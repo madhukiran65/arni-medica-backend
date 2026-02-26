@@ -22,17 +22,18 @@ class Command(BaseCommand):
             self.stdout.write('Superseded stage already exists — skipping creation')
             superseded = WorkflowStage.objects.get(workflow=wf, slug='superseded')
         else:
-            # Bump Obsolete and Archived sequences to make room
+            # Bump Archived first (to 8), then Obsolete (to 7) to avoid unique constraint
             obsolete = WorkflowStage.objects.get(workflow=wf, slug='obsolete')
             archived = WorkflowStage.objects.get(workflow=wf, slug='archived')
+
+            # Must update in reverse order to avoid unique constraint on (workflow_id, sequence)
+            archived.sequence = 8
+            archived.save(update_fields=['sequence'])
+            self.stdout.write(f'  Archived bumped to sequence {archived.sequence}')
 
             obsolete.sequence = 7
             obsolete.save(update_fields=['sequence'])
             self.stdout.write(f'  Obsolete bumped to sequence {obsolete.sequence}')
-
-            archived.sequence = 8
-            archived.save(update_fields=['sequence'])
-            self.stdout.write(f'  Archived bumped to sequence {archived.sequence}')
 
             # Create Superseded stage
             superseded = WorkflowStage.objects.create(
