@@ -220,7 +220,11 @@ class DocumentApprover(models.Model):
         related_name='document_approvals',
         help_text="Electronic signature for this approval"
     )
-    
+    is_final_approver = models.BooleanField(
+        default=False,
+        help_text="Whether this is the final approver in the chain"
+    )
+
     class Meta:
         unique_together = [['document', 'approver']]
         ordering = ['sequence']
@@ -250,6 +254,10 @@ class DocumentSnapshot(models.Model):
         ('approval', 'Approval'),
         ('archive', 'Archive'),
         ('review', 'Review'),
+        ('training_complete', 'Training Complete'),
+        ('effective', 'Effective'),
+        ('superseded', 'Superseded'),
+        ('cancelled', 'Cancelled'),
     ]
     
     document = models.ForeignKey(
@@ -555,9 +563,14 @@ class Document(AuditedModel):
     
     VAULT_STATE_CHOICES = [
         ('draft', 'Draft'),
-        ('released', 'Released'),
-        ('archived', 'Archived'),
+        ('in_review', 'In Review'),
+        ('approved', 'Approved'),
+        ('training_period', 'Training Period'),
+        ('effective', 'Effective'),
+        ('superseded', 'Superseded'),
         ('obsolete', 'Obsolete'),
+        ('archived', 'Archived'),
+        ('cancelled', 'Cancelled'),
     ]
     
     DISTRIBUTION_RESTRICTION_CHOICES = [
@@ -731,7 +744,58 @@ class Document(AuditedModel):
         default=24,
         help_text="Document review period in months (determines next_review_date)"
     )
-    
+
+    # --- ENHANCED LIFECYCLE FIELDS ---
+    training_completion_required = models.BooleanField(
+        default=False,
+        help_text="Whether all training must be completed before document becomes effective"
+    )
+    training_completion_deadline_days = models.PositiveIntegerField(
+        default=30,
+        help_text="Number of days allowed for training completion after approval"
+    )
+    training_completed_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date when all required training was completed"
+    )
+    approved_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date when document was formally approved"
+    )
+    cancelled_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date when document was cancelled"
+    )
+    cancelled_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cancelled_documents',
+        help_text="User who cancelled this document"
+    )
+    cancellation_reason = models.TextField(
+        blank=True,
+        help_text="Reason for document cancellation"
+    )
+    superseded_by = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='supersedes_documents',
+        help_text="Document that supersedes this one"
+    )
+    workflow_category = models.CharField(
+        max_length=50, blank=True, default='standard',
+        choices=[
+            ('full_governance', 'Full Governance'),
+            ('standard', 'Standard'),
+            ('simplified', 'Simplified'),
+            ('technical', 'Technical'),
+            ('design_control', 'Design Control'),
+            ('regulatory', 'Regulatory'),
+            ('risk_management', 'Risk Management'),
+            ('legal_contracts', 'Legal/Contracts'),
+            ('training', 'Training'),
+        ],
+        help_text="Workflow category determining approval requirements"
+    )
+
     # --- FILE FIELDS ---
     file = models.FileField(
         upload_to='documents/%Y/%m/',
@@ -991,7 +1055,7 @@ class Document(AuditedModel):
         if active:
             return active.checked_out_by == user
 
-        return self.vault_state == 'draft'
+        return self.vault_state in ('draft', 'in_review')
     
     def get_approval_status(self):
         """

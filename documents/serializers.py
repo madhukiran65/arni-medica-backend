@@ -101,12 +101,12 @@ class DocumentCheckoutSerializer(serializers.ModelSerializer):
 
 class DocumentApproverSerializer(serializers.ModelSerializer):
     """Serializer for DocumentApprover with read-only approver username."""
-    
+
     approver_username = serializers.CharField(
         source='approver.username',
         read_only=True
     )
-    
+
     class Meta:
         model = DocumentApprover
         fields = [
@@ -120,6 +120,7 @@ class DocumentApproverSerializer(serializers.ModelSerializer):
             'comments',
             'approved_at',
             'signature',
+            'is_final_approver',
         ]
         read_only_fields = ['id', 'approved_at']
 
@@ -354,6 +355,15 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             'obsolete_date',
             'archived_date',
             'review_period_months',
+            'training_completion_required',
+            'training_completion_deadline_days',
+            'training_completed_date',
+            'approved_date',
+            'cancelled_date',
+            'cancelled_by',
+            'cancellation_reason',
+            'superseded_by',
+            'workflow_category',
             'file',
             'file_hash',
             'file_size',
@@ -373,6 +383,9 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             'is_template',
             'is_controlled_copy',
             'has_attachments',
+            'watermark_text',
+            'review_frequency_days',
+            'requires_dual_approval',
             'content',
             'content_html',
             'content_plain_text',
@@ -447,6 +460,9 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             'requires_approval',
             'is_template',
             'review_period_months',
+            'training_completion_required',
+            'training_completion_deadline_days',
+            'workflow_category',
             'content',
             'content_html',
             'description',

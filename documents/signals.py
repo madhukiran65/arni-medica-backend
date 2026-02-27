@@ -33,3 +33,67 @@ def create_initial_document_version(sender, instance, created, **kwargs):
                 'created_at': str(instance.created_at) if instance.created_at else None,
             },
         )
+
+
+@receiver(post_save, sender=Document)
+def auto_assign_training_on_approval(sender, instance, **kwargs):
+    """Auto-assign training when document enters training_period state."""
+    if instance.vault_state == 'training_period' and instance.requires_training:
+        try:
+            from training.models import TrainingAssignment
+            from django.contrib.auth.models import User
+
+            # Get applicable roles
+            applicable_roles = instance.training_applicable_roles or []
+
+            if applicable_roles:
+                # Find users with these roles
+                users = User.objects.filter(
+                    profile__roles__name__in=applicable_roles
+                ).distinct()
+            else:
+                # If no roles specified, assign to department users
+                if instance.department:
+                    users = User.objects.filter(
+                        profile__department=instance.department
+                    ).distinct()
+                else:
+                    users = User.objects.none()
+
+            for user in users:
+                TrainingAssignment.objects.get_or_create(
+                    triggering_document=instance,
+                    trainee=user,
+                    defaults={
+                        'auto_triggered': True,
+                        'status': 'assigned',
+                        'created_by': instance.updated_by or instance.owner,
+                        'updated_by': instance.updated_by or instance.owner,
+                    }
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Auto-assign training failed: {e}")
+
+
+@receiver(post_save, sender=Document)
+def notify_periodic_review_due(sender, instance, **kwargs):
+    """Send notification when document is approaching review date."""
+    if instance.vault_state == 'effective' and instance.next_review_date:
+        from django.utils import timezone
+        from datetime import timedelta
+        today = timezone.now().date()
+        warning_date = instance.next_review_date - timedelta(days=30)
+
+        if today >= warning_date and today < instance.next_review_date:
+            try:
+                from core.notifications import NotificationService
+                NotificationService.send_notification(
+                    user=instance.owner,
+                    title=f'Periodic Review Due: {instance.document_id}',
+                    message=f'Document "{instance.title}" is due for periodic review on {instance.next_review_date}.',
+                    notification_type='review_reminder',
+                    related_object=instance,
+                )
+            except Exception:
+                pass

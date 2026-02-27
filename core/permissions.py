@@ -41,3 +41,22 @@ class CanViewAuditTrail(BasePermission):
         if not hasattr(request.user, 'profile'):
             return False
         return request.user.profile.roles.filter(can_view_audit_trail=True).exists()
+
+
+class TrainingGatePermission(BasePermission):
+    """
+    Blocks access to document content if user hasn't completed required training.
+    Only applies to documents in 'effective' state with requires_training=True.
+    """
+    def has_object_permission(self, request, view, obj):
+        # Only gate effective documents that require training
+        if not hasattr(obj, 'vault_state') or obj.vault_state != 'effective':
+            return True
+        if not getattr(obj, 'requires_training', False):
+            return True
+
+        # Check if user has acknowledged
+        from documents.models import DocumentAcknowledgment
+        return DocumentAcknowledgment.objects.filter(
+            document=obj, user=request.user
+        ).exists()

@@ -609,59 +609,450 @@ class DocumentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def lifecycle_transition(self, request, pk=None):
         """
-        Transition document to new lifecycle stage.
+        FSM-validated lifecycle transition.
 
         POST body: {
-            "target_stage": "string",
-            "comments": "string (optional)"
+            "target_stage": "in_review|approved|effective|...",
+            "comments": "string (optional)",
+            "password": "string (required for e-signature)"
         }
         """
         document = self.get_object()
         serializer = LifecycleTransitionSerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        target_state = serializer.validated_data['target_stage']
+        current_state = document.vault_state
+
+        # FSM validation
+        from .fsm import validate_transition, check_transition_permission
         try:
-            old_stage = document.lifecycle_stage
-            document.lifecycle_stage = serializer.validated_data['target_stage']
+            validate_transition(current_state, target_state)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Permission check
+        allowed, reason = check_transition_permission(current_state, target_state, request.user, document)
+        if not allowed:
+            return Response({'error': reason}, status=status.HTTP_403_FORBIDDEN)
+
+        # Password verification for e-signature
+        password = serializer.validated_data.get('password', '')
+        if password and not request.user.check_password(password):
+            return Response({'error': 'Invalid password for electronic signature'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            old_state = document.vault_state
+            document.vault_state = target_state
+            document.lifecycle_stage = target_state
             document.updated_by = request.user
+
+            # Set state-specific dates
+            now = timezone.now()
+            if target_state == 'approved':
+                document.approved_date = now
+            elif target_state == 'effective':
+                document.effective_date = now.date()
+                if document.review_period_months:
+                    try:
+                        from dateutil.relativedelta import relativedelta
+                        document.next_review_date = now.date() + relativedelta(months=document.review_period_months)
+                    except ImportError:
+                        from datetime import timedelta
+                        document.next_review_date = now.date() + timedelta(days=document.review_period_months * 30)
+            elif target_state == 'obsolete':
+                document.obsolete_date = now.date()
+            elif target_state == 'archived':
+                document.archived_date = now.date()
+            elif target_state == 'cancelled':
+                document.cancelled_date = now
+                document.cancelled_by = request.user
+                document.cancellation_reason = serializer.validated_data.get('comments', '')
+
             document.save()
 
-            # Send notification for lifecycle transition
+            # Create snapshot
+            DocumentSnapshot.objects.create(
+                document=document,
+                version_string=document.version_string,
+                snapshot_type=target_state if target_state in ['approval', 'release', 'archive', 'review', 'training_complete', 'effective', 'superseded', 'cancelled'] else 'review',
+                snapshot_data={
+                    'from_state': old_state,
+                    'to_state': target_state,
+                    'transitioned_by': request.user.username,
+                    'comments': serializer.validated_data.get('comments', ''),
+                    'timestamp': now.isoformat(),
+                },
+                created_by=request.user,
+            )
+
+            # Auto-transition: approved → training_period if training required
+            if target_state == 'approved' and document.requires_training and document.training_completion_required:
+                document.vault_state = 'training_period'
+                document.lifecycle_stage = 'training_period'
+                document.save()
+                # Auto-assign training (signal will handle this)
+
+            # Send notifications
             try:
                 from core.notifications import NotificationService
                 NotificationService.send_workflow_transition(
                     record=document,
-                    from_stage=old_stage or 'Draft',
-                    to_stage=document.lifecycle_stage,
+                    from_stage=old_state,
+                    to_stage=document.vault_state,
                     transitioned_by=request.user,
                     record_type='document',
                 )
-                # If transitioning to InReview, notify approvers
-                if document.lifecycle_stage in ('InReview', 'in_review', 'SignOff', 'sign_off'):
-                    approvers = [a.approver for a in document.approvers.filter(
-                        approval_status='pending'
-                    ) if a.approver]
-                    if approvers:
-                        NotificationService.send_approval_request(
-                            document=document,
-                            approvers=approvers,
-                            requester=request.user,
-                        )
-            except Exception as notify_err:
-                import logging
-                logging.getLogger(__name__).warning(f"Notification failed: {notify_err}")
+            except Exception:
+                pass
 
-            return Response(
-                DocumentDetailSerializer(document).data,
-                status=status.HTTP_200_OK
-            )
+            return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response(
-                {'error': f'Transition failed: {str(e)}'},
-                status=status.HTTP_400_BAD_REQUEST
+            return Response({'error': f'Transition failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def submit_for_review(self, request, pk=None):
+        """Submit draft document for review. Shortcut for draft → in_review."""
+        document = self.get_object()
+        if document.vault_state != 'draft':
+            return Response({'error': 'Only draft documents can be submitted for review'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check document has approvers assigned
+        if not document.approvers.exists():
+            return Response({'error': 'Please assign at least one reviewer/approver before submitting'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check author permission
+        if document.owner != request.user and document.created_by != request.user and not request.user.is_staff:
+            return Response({'error': 'Only the document owner can submit for review'}, status=status.HTTP_403_FORBIDDEN)
+
+        document.vault_state = 'in_review'
+        document.lifecycle_stage = 'in_review'
+        document.is_locked = True
+        document.locked_by = request.user
+        document.locked_at = timezone.now()
+        document.lock_reason = 'Submitted for review'
+        document.updated_by = request.user
+        document.save()
+
+        # Reset all approver statuses to pending
+        document.approvers.all().update(approval_status='pending', approved_at=None, comments='')
+
+        # Notify approvers
+        try:
+            from core.notifications import NotificationService
+            approvers = [a.approver for a in document.approvers.filter(approval_status='pending') if a.approver]
+            if approvers:
+                NotificationService.send_approval_request(
+                    document=document, approvers=approvers, requester=request.user,
+                )
+        except Exception:
+            pass
+
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def final_approve(self, request, pk=None):
+        """
+        Final approval that transitions document from in_review → approved.
+        Requires all approvers to have approved.
+        """
+        document = self.get_object()
+        if document.vault_state != 'in_review':
+            return Response({'error': 'Document must be in review to approve'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify password for e-signature
+        password = request.data.get('password', '')
+        if not password or not request.user.check_password(password):
+            return Response({'error': 'Valid password required for electronic signature'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Record this user's approval
+        approver_record = document.approvers.filter(approver=request.user).first()
+        if approver_record:
+            approver_record.approval_status = 'approved'
+            approver_record.approved_at = timezone.now()
+            approver_record.comments = request.data.get('comments', '')
+            approver_record.save()
+
+        # Check if ALL approvers have approved
+        if not document.is_fully_approved():
+            pending = document.approvers.filter(approval_status='pending').count()
+            return Response({
+                'message': 'Your approval recorded. Waiting for remaining approvers.',
+                'pending_approvals': pending,
+                'your_status': 'approved',
+            }, status=status.HTTP_200_OK)
+
+        # All approved — transition to approved state
+        document.vault_state = 'approved'
+        document.lifecycle_stage = 'approved'
+        document.approved_date = timezone.now()
+        document.released_date = timezone.now()
+        document.updated_by = request.user
+
+        # Auto-transition to training_period if training required
+        if document.requires_training and document.training_completion_required:
+            document.vault_state = 'training_period'
+            document.lifecycle_stage = 'training_period'
+        elif not document.requires_training:
+            # No training required — go directly to effective
+            document.vault_state = 'effective'
+            document.lifecycle_stage = 'effective'
+            document.effective_date = timezone.now().date()
+            if document.review_period_months:
+                try:
+                    from dateutil.relativedelta import relativedelta
+                    document.next_review_date = timezone.now().date() + relativedelta(months=document.review_period_months)
+                except ImportError:
+                    from datetime import timedelta
+                    document.next_review_date = timezone.now().date() + timedelta(days=document.review_period_months * 30)
+
+        document.is_locked = True
+        document.save()
+
+        # Create approval snapshot
+        DocumentSnapshot.objects.create(
+            document=document,
+            version_string=document.version_string,
+            snapshot_type='approval',
+            snapshot_data={
+                'approved_by': [{'user': a.approver.username, 'at': str(a.approved_at)} for a in document.approvers.filter(approval_status='approved')],
+                'final_state': document.vault_state,
+            },
+            created_by=request.user,
+        )
+
+        # Increment major version on approval
+        document.major_version += 1
+        document.minor_version = 0
+        document.save()
+
+        # Create version record
+        DocumentVersion.objects.create(
+            document=document,
+            major_version=document.major_version,
+            minor_version=0,
+            change_type='major',
+            is_major_change=True,
+            change_summary=f'Approved and released v{document.major_version}.0',
+            snapshot_data={
+                'vault_state': document.vault_state,
+                'approved_date': str(document.approved_date),
+            },
+            released_date=timezone.now(),
+            created_by=request.user,
+            updated_by=request.user,
+        )
+
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def make_effective(self, request, pk=None):
+        """Transition approved/training_period document to effective."""
+        document = self.get_object()
+        if document.vault_state not in ('approved', 'training_period'):
+            return Response({'error': 'Document must be approved or in training period'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.is_staff:
+            return Response({'error': 'Only administrators can manually make documents effective'}, status=status.HTTP_403_FORBIDDEN)
+
+        document.vault_state = 'effective'
+        document.lifecycle_stage = 'effective'
+        document.effective_date = timezone.now().date()
+        document.updated_by = request.user
+
+        if document.review_period_months:
+            try:
+                from dateutil.relativedelta import relativedelta
+                document.next_review_date = timezone.now().date() + relativedelta(months=document.review_period_months)
+            except ImportError:
+                from datetime import timedelta
+                document.next_review_date = timezone.now().date() + timedelta(days=document.review_period_months * 30)
+
+        document.save()
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def cancel_document(self, request, pk=None):
+        """Cancel a document (only from draft or in_review)."""
+        document = self.get_object()
+        if document.vault_state not in ('draft', 'in_review'):
+            return Response({'error': 'Only draft or in-review documents can be cancelled'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = request.data.get('reason', '')
+        if not reason:
+            return Response({'error': 'Cancellation reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        document.vault_state = 'cancelled'
+        document.lifecycle_stage = 'cancelled'
+        document.cancelled_date = timezone.now()
+        document.cancelled_by = request.user
+        document.cancellation_reason = reason
+        document.updated_by = request.user
+        document.save()
+
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def supersede(self, request, pk=None):
+        """Supersede an effective document with a new version."""
+        document = self.get_object()
+        if document.vault_state != 'effective':
+            return Response({'error': 'Only effective documents can be superseded'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.is_staff:
+            return Response({'error': 'Only administrators can supersede documents'}, status=status.HTTP_403_FORBIDDEN)
+
+        new_doc_id = request.data.get('superseded_by_id')
+        if new_doc_id:
+            try:
+                new_doc = Document.objects.get(id=new_doc_id)
+                document.superseded_by = new_doc
+            except Document.DoesNotExist:
+                pass
+
+        document.vault_state = 'superseded'
+        document.lifecycle_stage = 'superseded'
+        document.updated_by = request.user
+        document.save()
+
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def make_obsolete(self, request, pk=None):
+        """Mark an effective document as obsolete."""
+        document = self.get_object()
+        if document.vault_state != 'effective':
+            return Response({'error': 'Only effective documents can be made obsolete'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.is_staff:
+            return Response({'error': 'Only administrators can obsolete documents'}, status=status.HTTP_403_FORBIDDEN)
+
+        document.vault_state = 'obsolete'
+        document.lifecycle_stage = 'obsolete'
+        document.obsolete_date = timezone.now().date()
+        document.updated_by = request.user
+        document.save()
+
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def archive_document(self, request, pk=None):
+        """Archive a superseded, obsolete, or effective document."""
+        document = self.get_object()
+        if document.vault_state not in ('effective', 'superseded', 'obsolete'):
+            return Response({'error': 'Only effective, superseded, or obsolete documents can be archived'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.is_staff:
+            return Response({'error': 'Only administrators can archive documents'}, status=status.HTTP_403_FORBIDDEN)
+
+        document.vault_state = 'archived'
+        document.lifecycle_stage = 'archived'
+        document.archived_date = timezone.now().date()
+        document.updated_by = request.user
+        document.save()
+
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def initiate_revision(self, request, pk=None):
+        """Start a revision cycle on an effective document (creates new draft version)."""
+        document = self.get_object()
+        if document.vault_state != 'effective':
+            return Response({'error': 'Only effective documents can be revised'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create a new draft version linked to this document
+        document.vault_state = 'draft'
+        document.lifecycle_stage = 'draft'
+        document.is_locked = False
+        document.locked_by = None
+        document.locked_at = None
+        document.lock_reason = ''
+        document.minor_version += 1
+        document.updated_by = request.user
+        document.save()
+
+        # Reset approvals
+        document.approvers.all().update(approval_status='pending', approved_at=None, comments='')
+
+        return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def available_transitions(self, request, pk=None):
+        """Get list of available state transitions for this document."""
+        document = self.get_object()
+        from .fsm import get_available_transitions, check_transition_permission
+
+        transitions = get_available_transitions(document.vault_state)
+        # Filter by user permissions
+        result = []
+        for t in transitions:
+            allowed, reason = check_transition_permission(
+                document.vault_state, t['target_state'], request.user, document
             )
+            t['allowed'] = allowed
+            t['reason'] = reason if not allowed else ''
+            result.append(t)
+
+        return Response({
+            'current_state': document.vault_state,
+            'transitions': result,
+        })
+
+    @action(detail=True, methods=['get'])
+    def training_status(self, request, pk=None):
+        """Get training completion status for this document."""
+        document = self.get_object()
+
+        try:
+            from training.models import TrainingAssignment
+            assignments = TrainingAssignment.objects.filter(triggering_document=document)
+            total = assignments.count()
+            completed = assignments.filter(status='completed').count()
+
+            return Response({
+                'document_id': document.document_id,
+                'requires_training': document.requires_training,
+                'training_completion_required': document.training_completion_required,
+                'total_assignments': total,
+                'completed': completed,
+                'pending': total - completed,
+                'completion_percentage': round((completed / total * 100), 1) if total > 0 else 0,
+                'all_complete': completed == total and total > 0,
+            })
+        except Exception:
+            return Response({
+                'document_id': document.document_id,
+                'requires_training': document.requires_training,
+                'total_assignments': 0,
+                'completed': 0,
+                'pending': 0,
+                'completion_percentage': 0,
+                'all_complete': False,
+            })
+
+    @action(detail=True, methods=['post'])
+    def acknowledge(self, request, pk=None):
+        """Record user acknowledgment of a document."""
+        document = self.get_object()
+        from .models import DocumentAcknowledgment
+
+        method = request.data.get('method', 'read')
+
+        ack, created = DocumentAcknowledgment.objects.get_or_create(
+            document=document,
+            user=request.user,
+            defaults={'method': method}
+        )
+
+        if not created:
+            return Response({'message': 'Already acknowledged', 'acknowledged_at': ack.acknowledged_at}, status=status.HTTP_200_OK)
+
+        return Response({
+            'message': 'Document acknowledged',
+            'acknowledged_at': ack.acknowledged_at,
+            'method': ack.method,
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
