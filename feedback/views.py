@@ -55,14 +55,16 @@ class FeedbackTicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def assign(self, request, pk=None):
-        """Admin assigns a ticket to a user."""
+        """Admin assigns a ticket to a user and/or marks in progress."""
         ticket = self.get_object()
         assigned_to_id = request.data.get('assigned_to')
+        update_fields = ['status', 'updated_by', 'updated_at']
         if assigned_to_id:
             ticket.assigned_to_id = assigned_to_id
-            ticket.status = 'in_progress'
-            ticket.updated_by = request.user
-            ticket.save(update_fields=['assigned_to', 'status', 'updated_by', 'updated_at'])
+            update_fields.append('assigned_to')
+        ticket.status = 'in_progress'
+        ticket.updated_by = request.user
+        ticket.save(update_fields=update_fields)
         return Response(FeedbackTicketDetailSerializer(ticket).data)
 
     @action(detail=True, methods=['post'])
