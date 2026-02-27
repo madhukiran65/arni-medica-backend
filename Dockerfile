@@ -18,9 +18,10 @@ COPY . .
 
 RUN python manage.py collectstatic --noinput || true
 
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
+
 EXPOSE 8000
 
-# Migrate with verbose output, then start server
-# Using || true so gunicorn always starts (Railway needs a running process)
-# Migrations will log errors but won't block the health check
-CMD python manage.py migrate --noinput -v 2 2>&1; python manage.py seed_eqms 2>&1 || true; gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120 --log-level debug
+# Use entrypoint script for reliable migrations + server start
+CMD ["./entrypoint.sh"]
