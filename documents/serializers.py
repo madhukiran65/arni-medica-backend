@@ -16,6 +16,7 @@ from .models import (
     DocumentSubType,
     DocumentCheckout,
     DocumentApprover,
+    DocumentCollaborator,
     DocumentSnapshot,
     DocumentVersion,
     DocumentChangeOrder,
@@ -123,6 +124,33 @@ class DocumentApproverSerializer(serializers.ModelSerializer):
             'is_final_approver',
         ]
         read_only_fields = ['id', 'approved_at']
+
+
+class DocumentCollaboratorSerializer(serializers.ModelSerializer):
+    """Serializer for DocumentCollaborator with user and department details."""
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    full_name = serializers.SerializerMethodField()
+    email = serializers.EmailField(source='user.email', read_only=True)
+    department = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentCollaborator
+        fields = [
+            'id', 'document', 'user_id', 'username', 'full_name',
+            'email', 'department', 'roles', 'status', 'added_by',
+            'added_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'added_by', 'added_at', 'updated_at']
+
+    def get_full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}".strip() or obj.user.username
+
+    def get_department(self, obj):
+        profile = getattr(obj.user, 'profile', None)
+        if profile and profile.department:
+            return profile.department.name
+        return ''
 
 
 # ============================================================================

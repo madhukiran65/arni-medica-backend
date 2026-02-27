@@ -19,6 +19,7 @@ from .models import (
     DocumentSnapshot,
     DocumentVersion,
     DocumentApprover,
+    DocumentCollaborator,
     DocumentComment,
     DocumentSuggestion,
 )
@@ -32,6 +33,7 @@ from .serializers import (
     DocumentSnapshotSerializer,
     DocumentVersionSerializer,
     DocumentApproverSerializer,
+    DocumentCollaboratorSerializer,
     DocumentCommentSerializer,
     DocumentSuggestionSerializer,
     DocumentContentUpdateSerializer,
@@ -1244,6 +1246,90 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return Response({'message': 'Approver removed'}, status=status.HTTP_204_NO_CONTENT)
         except DocumentApprover.DoesNotExist:
             return Response({'error': 'Approver not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['get', 'post'])
+    def collaborators_list(self, request, pk=None):
+        """GET: List collaborators. POST: Add a collaborator."""
+        document = self.get_object()
+
+        if request.method == 'GET':
+            collabs = DocumentCollaborator.objects.filter(
+                document=document
+            ).exclude(status='removed').select_related('user', 'user__profile', 'user__profile__department')
+            serializer = DocumentCollaboratorSerializer(collabs, many=True)
+            return Response(serializer.data)
+
+        # POST: Add collaborator
+        user_id = request.data.get('user_id')
+        roles = request.data.get('roles', ['collaborator'])
+
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=400)
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+
+        # Validate roles
+        valid_roles = ['author', 'collaborator', 'reviewer_only', 'reviewer_approver']
+        for role in roles:
+            if role not in valid_roles:
+                return Response({'error': f'Invalid role: {role}. Valid: {valid_roles}'}, status=400)
+
+        collab, created = DocumentCollaborator.objects.update_or_create(
+            document=document,
+            user=user,
+            defaults={
+                'roles': roles,
+                'status': 'active',
+                'added_by': request.user,
+            }
+        )
+
+        serializer = DocumentCollaboratorSerializer(collab)
+        return Response(serializer.data, status=201 if created else 200)
+
+    @action(detail=True, methods=['patch'], url_path='collaborators_list/(?P<collab_id>[0-9]+)')
+    def update_collaborator(self, request, pk=None, collab_id=None):
+        """Update a collaborator's roles."""
+        document = self.get_object()
+        try:
+            collab = DocumentCollaborator.objects.get(id=collab_id, document=document)
+        except DocumentCollaborator.DoesNotExist:
+            return Response({'error': 'Collaborator not found'}, status=404)
+
+        roles = request.data.get('roles')
+        status_val = request.data.get('status')
+
+        if roles is not None:
+            valid_roles = ['author', 'collaborator', 'reviewer_only', 'reviewer_approver']
+            for role in roles:
+                if role not in valid_roles:
+                    return Response({'error': f'Invalid role: {role}'}, status=400)
+            collab.roles = roles
+
+        if status_val is not None:
+            collab.status = status_val
+
+        collab.save()
+        serializer = DocumentCollaboratorSerializer(collab)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['delete'], url_path='remove_collaborator/(?P<collab_id>[0-9]+)')
+    def remove_collaborator(self, request, pk=None, collab_id=None):
+        """Remove a collaborator from a document."""
+        document = self.get_object()
+        try:
+            collab = DocumentCollaborator.objects.get(id=collab_id, document=document)
+        except DocumentCollaborator.DoesNotExist:
+            return Response({'error': 'Collaborator not found'}, status=404)
+
+        collab.status = 'removed'
+        collab.save()
+        return Response({'status': 'removed'}, status=200)
 
     @action(detail=True, methods=['get'])
     def versions(self, request, pk=None):

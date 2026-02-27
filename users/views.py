@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.filters import SearchFilter
 from django.contrib.auth.models import User
 from django.db.models import Count
 from .models import Department, Role, UserProfile, Site, ProductLine
@@ -44,6 +45,8 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [SearchFilter]
+    search_fields = ['user__username', 'user__first_name', 'user__last_name', 'user__email', 'employee_id']
 
     def get_queryset(self):
         """Filter queryset based on user permissions"""

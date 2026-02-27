@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.postgres.fields import ArrayField
+from django.conf import settings
 import hashlib
 import json
 from datetime import datetime, timedelta
@@ -238,6 +239,60 @@ class DocumentApprover(models.Model):
     
     def __str__(self):
         return f"{self.document.document_id} - {self.approver.username} (Step {self.sequence})"
+
+
+class DocumentCollaborator(models.Model):
+    """Tracks collaborators assigned to a document with their roles."""
+    ROLE_CHOICES = [
+        ('author', 'Author'),
+        ('collaborator', 'Collaborator'),
+        ('reviewer_only', 'Reviewer Only'),
+        ('reviewer_approver', 'Reviewer & Approver'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('removed', 'Removed'),
+    ]
+
+    document = models.ForeignKey(
+        'Document',
+        on_delete=models.CASCADE,
+        related_name='collaborators',
+        help_text='Document this collaborator is assigned to'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='document_collaborations',
+        help_text='User assigned as collaborator'
+    )
+    roles = models.JSONField(
+        default=list,
+        help_text='List of roles assigned, e.g. ["author", "reviewer_only"]'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='collaborators_added',
+        help_text='User who added this collaborator'
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['document', 'user']
+        ordering = ['-added_at']
+
+    def __str__(self):
+        return f"{self.user.username} on {self.document.document_id} ({', '.join(self.roles)})"
 
 
 class DocumentSnapshot(models.Model):
