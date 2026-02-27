@@ -9,6 +9,8 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Count, Q
+from django.db import transaction
+import threading
 import hashlib
 
 from .models import (
@@ -716,18 +718,27 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 document.save()
                 # Auto-assign training (signal will handle this)
 
-            # Send notifications
-            try:
-                from core.notifications import NotificationService
-                NotificationService.send_workflow_transition(
-                    record=document,
-                    from_stage=old_state,
-                    to_stage=document.vault_state,
-                    transitioned_by=request.user,
-                    record_type='document',
-                )
-            except Exception:
-                pass
+            # Send notifications AFTER transaction commits (non-blocking)
+            _doc_id = document.id
+            _old = old_state
+            _new = document.vault_state
+            _uid = request.user.id
+
+            def _notify_transition():
+                try:
+                    from core.notifications import NotificationService
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    _doc = Document.objects.get(id=_doc_id)
+                    _user = User.objects.get(id=_uid)
+                    NotificationService.send_workflow_transition(
+                        record=_doc, from_stage=_old, to_stage=_new,
+                        transitioned_by=_user, record_type='document',
+                    )
+                except Exception:
+                    pass
+
+            transaction.on_commit(lambda: threading.Thread(target=_notify_transition, daemon=True).start())
 
             return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
         except Exception as e:
@@ -760,16 +771,26 @@ class DocumentViewSet(viewsets.ModelViewSet):
         # Reset all approver statuses to pending
         document.approvers.all().update(approval_status='pending', approved_at=None, comments='')
 
-        # Notify approvers
-        try:
-            from core.notifications import NotificationService
-            approvers = [a.approver for a in document.approvers.filter(approval_status='pending') if a.approver]
-            if approvers:
-                NotificationService.send_approval_request(
-                    document=document, approvers=approvers, requester=request.user,
-                )
-        except Exception:
-            pass
+        # Notify approvers AFTER transaction commits (non-blocking)
+        doc_id = document.id
+        user_id = request.user.id
+
+        def _send_notifications():
+            try:
+                from core.notifications import NotificationService
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                doc = Document.objects.get(id=doc_id)
+                requester = User.objects.get(id=user_id)
+                approver_users = [a.approver for a in doc.approvers.filter(approval_status='pending') if a.approver]
+                if approver_users:
+                    NotificationService.send_approval_request(
+                        document=doc, approvers=approver_users, requester=requester,
+                    )
+            except Exception:
+                pass
+
+        transaction.on_commit(lambda: threading.Thread(target=_send_notifications, daemon=True).start())
 
         return Response(DocumentDetailSerializer(document).data, status=status.HTTP_200_OK)
 
@@ -1106,17 +1127,24 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 }
             )
 
-            # Send notification to document owner about approval
-            try:
-                from core.notifications import NotificationService
-                NotificationService.send_approval_complete(
-                    document=document,
-                    approver=request.user,
-                    decision='approved',
-                )
-            except Exception as notify_err:
-                import logging
-                logging.getLogger(__name__).warning(f"Approval notification failed: {notify_err}")
+            # Send notification AFTER transaction commits (non-blocking)
+            _doc_id = document.id
+            _uid = request.user.id
+
+            def _notify_approval():
+                try:
+                    from core.notifications import NotificationService
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    _doc = Document.objects.get(id=_doc_id)
+                    _user = User.objects.get(id=_uid)
+                    NotificationService.send_approval_complete(
+                        document=_doc, approver=_user, decision='approved',
+                    )
+                except Exception:
+                    pass
+
+            transaction.on_commit(lambda: threading.Thread(target=_notify_approval, daemon=True).start())
 
             return Response(
                 DocumentApproverSerializer(approver).data,
