@@ -31,7 +31,7 @@ def _db_check(request):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v20-assign-fix'
+    result['build_marker'] = 'v21-cleanup-users'
     return JsonResponse(result)
 
 
@@ -41,7 +41,7 @@ def _run_mgmt(request):
     command = request.GET.get('cmd', '')
     if not command:
         return JsonResponse({'error': 'Missing ?cmd= parameter'})
-    allowed = ['enrich_demo_data', 'seed_form_templates', 'seed_demo_data', 'seed_eqms', 'seed_data', 'add_superseded_stage']
+    allowed = ['enrich_demo_data', 'seed_form_templates', 'seed_demo_data', 'seed_eqms', 'seed_data', 'add_superseded_stage', 'cleanup_dummy_users']
     if command not in allowed:
         return JsonResponse({'error': f'Command not allowed. Allowed: {allowed}'})
     cmd = ['python', 'manage.py', command]
