@@ -41,10 +41,12 @@ def _run_mgmt(request):
     command = request.GET.get('cmd', '')
     if not command:
         return JsonResponse({'error': 'Missing ?cmd= parameter'})
-    allowed = ['enrich_demo_data', 'seed_form_templates', 'seed_demo_data', 'seed_eqms', 'seed_data', 'add_superseded_stage', 'cleanup_dummy_users']
+    allowed = ['enrich_demo_data', 'seed_form_templates', 'seed_demo_data', 'seed_eqms', 'seed_data', 'add_superseded_stage', 'cleanup_dummy_users', 'migrate', 'showmigrations']
     if command not in allowed:
         return JsonResponse({'error': f'Command not allowed. Allowed: {allowed}'})
     cmd = ['python', 'manage.py', command]
+    if command == 'migrate':
+        cmd.append('--noinput')
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd='/app')
         return JsonResponse({
