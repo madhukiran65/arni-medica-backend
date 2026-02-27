@@ -37,6 +37,7 @@ class FeedbackTicket(AuditedModel):
         ('equipment', 'Equipment'),
         ('batch_records', 'Batch Records'),
         ('validation', 'Validation'),
+        ('management_review', 'Management Review'),
         ('admin_settings', 'Admin Settings'),
         ('general', 'General / Other'),
     ]
