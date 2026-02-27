@@ -31,7 +31,7 @@ def _db_check(request):
             mig_files[app_dir] = sorted([f for f in os.listdir(mig_path) if f.endswith('.py') and f != '__init__.py'])
     result['migration_files_on_disk'] = mig_files
     # Build version
-    result['build_marker'] = 'v19-feedback-fix'
+    result['build_marker'] = 'v20-assign-fix'
     return JsonResponse(result)
 
 
