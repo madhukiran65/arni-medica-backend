@@ -19,10 +19,12 @@ class FeedbackTicketListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FeedbackTicket
-        fields = ['id', 'ticket_id', 'type', 'title', 'priority', 'module',
-                  'status', 'submitted_by', 'submitted_by_name',
+        fields = ['id', 'ticket_id', 'type', 'title', 'description',
+                  'priority', 'module', 'status',
+                  'submitted_by', 'submitted_by_name',
                   'assigned_to', 'assigned_to_name',
-                  'attachment_count', 'created_at', 'resolved_at']
+                  'resolution_summary', 'attachment_count',
+                  'created_at', 'resolved_at']
 
     def get_assigned_to_name(self, obj):
         return obj.assigned_to.username if obj.assigned_to else None
