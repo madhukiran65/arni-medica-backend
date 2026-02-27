@@ -135,6 +135,7 @@ urlpatterns = [
     path('api/batch-records/', include('batch_records.urls')),
     path('api/validation/', include('validation_mgmt.urls')),
     path('api/management-review/', include('management_review.urls')),
+    path('api/feedback/', include('feedback.urls')),
     # Health check
     path('api/health/', lambda r: __import__('django.http', fromlist=['JsonResponse']).JsonResponse({'status': 'ok'})),
     # DB diagnostic

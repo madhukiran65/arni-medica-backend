@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 
     'validation_mgmt.apps.ValidationMgmtConfig',
     'management_review.apps.ManagementReviewConfig',
+    'feedback.apps.FeedbackConfig',
 ]
 
 MIDDLEWARE = [
