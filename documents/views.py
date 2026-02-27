@@ -129,6 +129,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return DocumentCreateSerializer
         return DocumentDetailSerializer
 
+    def list(self, request, *args, **kwargs):
+        """Override list with error debugging."""
+        import traceback
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            return Response(
+                {'error': str(e), 'traceback': traceback.format_exc()},
+                status=500
+            )
+
     def retrieve(self, request, *args, **kwargs):
         """Override retrieve with error debugging."""
         import traceback
@@ -146,15 +157,22 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Override create with clean error handling."""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        import traceback
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
 
-        document = serializer.instance
-        return Response(
-            DocumentDetailSerializer(document).data,
-            status=status.HTTP_201_CREATED
-        )
+            document = serializer.instance
+            return Response(
+                DocumentDetailSerializer(document).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e), 'traceback': traceback.format_exc()},
+                status=500
+            )
 
     def perform_update(self, serializer):
         """Update document and set updated_by."""
