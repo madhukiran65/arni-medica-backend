@@ -54,7 +54,8 @@ class FeedbackTicketCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FeedbackTicket
-        fields = ['type', 'title', 'description', 'priority', 'module']
+        fields = ['id', 'ticket_id', 'type', 'title', 'description', 'priority', 'module']
+        read_only_fields = ['id', 'ticket_id']
 
     def create(self, validated_data):
         request = self.context['request']
