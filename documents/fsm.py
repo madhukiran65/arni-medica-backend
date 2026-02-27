@@ -14,6 +14,7 @@ VALID_TRANSITIONS = {
     'approved': ['training_period', 'effective'],  # effective if no training required
     'training_period': ['effective'],
     'effective': ['superseded', 'obsolete', 'archived', 'in_review'],  # in_review = periodic review revision
+    'released': ['superseded', 'obsolete', 'archived', 'in_review'],  # alias for effective (seed data compatibility)
     'superseded': ['archived'],
     'obsolete': ['archived'],
     'archived': [],  # terminal state
@@ -34,6 +35,10 @@ TRANSITION_PERMISSIONS = {
     ('effective', 'obsolete'): 'admin',
     ('effective', 'archived'): 'admin',
     ('effective', 'in_review'): 'author_or_admin',  # Periodic review / revision
+    ('released', 'superseded'): 'admin',
+    ('released', 'obsolete'): 'admin',
+    ('released', 'archived'): 'admin',
+    ('released', 'in_review'): 'author_or_admin',
     ('superseded', 'archived'): 'admin',
     ('obsolete', 'archived'): 'admin',
 }
@@ -52,6 +57,10 @@ TRANSITION_LABELS = {
     ('effective', 'obsolete'): 'Make Obsolete',
     ('effective', 'archived'): 'Archive',
     ('effective', 'in_review'): 'Initiate Revision',
+    ('released', 'superseded'): 'Supersede',
+    ('released', 'obsolete'): 'Make Obsolete',
+    ('released', 'archived'): 'Archive',
+    ('released', 'in_review'): 'Initiate Revision',
     ('superseded', 'archived'): 'Archive',
     ('obsolete', 'archived'): 'Archive',
 }

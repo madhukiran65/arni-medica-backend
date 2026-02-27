@@ -940,8 +940,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def supersede(self, request, pk=None):
         """Supersede an effective document with a new version."""
         document = self.get_object()
-        if document.vault_state != 'effective':
-            return Response({'error': 'Only effective documents can be superseded'}, status=status.HTTP_400_BAD_REQUEST)
+        if document.vault_state not in ('effective', 'released'):
+            return Response({'error': 'Only effective/released documents can be superseded'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not request.user.is_staff:
             return Response({'error': 'Only administrators can supersede documents'}, status=status.HTTP_403_FORBIDDEN)
@@ -965,8 +965,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def make_obsolete(self, request, pk=None):
         """Mark an effective document as obsolete."""
         document = self.get_object()
-        if document.vault_state != 'effective':
-            return Response({'error': 'Only effective documents can be made obsolete'}, status=status.HTTP_400_BAD_REQUEST)
+        if document.vault_state not in ('effective', 'released'):
+            return Response({'error': 'Only effective/released documents can be made obsolete'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not request.user.is_staff:
             return Response({'error': 'Only administrators can obsolete documents'}, status=status.HTTP_403_FORBIDDEN)
@@ -983,8 +983,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def archive_document(self, request, pk=None):
         """Archive a superseded, obsolete, or effective document."""
         document = self.get_object()
-        if document.vault_state not in ('effective', 'superseded', 'obsolete'):
-            return Response({'error': 'Only effective, superseded, or obsolete documents can be archived'}, status=status.HTTP_400_BAD_REQUEST)
+        if document.vault_state not in ('effective', 'released', 'superseded', 'obsolete'):
+            return Response({'error': 'Only effective, released, superseded, or obsolete documents can be archived'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not request.user.is_staff:
             return Response({'error': 'Only administrators can archive documents'}, status=status.HTTP_403_FORBIDDEN)
@@ -1001,8 +1001,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def initiate_revision(self, request, pk=None):
         """Start a revision cycle on an effective document (creates new draft version)."""
         document = self.get_object()
-        if document.vault_state != 'effective':
-            return Response({'error': 'Only effective documents can be revised'}, status=status.HTTP_400_BAD_REQUEST)
+        if document.vault_state not in ('effective', 'released'):
+            return Response({'error': 'Only effective/released documents can be revised'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create a new draft version linked to this document
         document.vault_state = 'draft'
