@@ -308,7 +308,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
 
 class DocumentDetailSerializer(serializers.ModelSerializer):
     """Full document serializer with nested relationships."""
-    
+
     infocard_type_name = serializers.CharField(
         source='infocard_type.name',
         read_only=True
@@ -333,6 +333,19 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         read_only=True,
         default=None
     )
+    # User detail fields for Created By / Updated By display
+    created_by_username = serializers.CharField(
+        source='created_by.username',
+        read_only=True,
+        default=None
+    )
+    created_by_name = serializers.SerializerMethodField()
+    updated_by_username = serializers.CharField(
+        source='updated_by.username',
+        read_only=True,
+        default=None
+    )
+    updated_by_name = serializers.SerializerMethodField()
     version_string = serializers.SerializerMethodField()
     versions = DocumentVersionSerializer(
         many=True,
@@ -425,8 +438,12 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             'approval_status',
             'created_at',
             'created_by',
+            'created_by_username',
+            'created_by_name',
             'updated_at',
             'updated_by',
+            'updated_by_username',
+            'updated_by_name',
         ]
         read_only_fields = [
             'id',
@@ -437,6 +454,10 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             'department_name',
             'owner_username',
             'locked_by_username',
+            'created_by_username',
+            'created_by_name',
+            'updated_by_username',
+            'updated_by_name',
             'versions',
             'approvers',
             'current_checkout',
@@ -446,18 +467,32 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             'updated_at',
             'updated_by',
         ]
-    
+
     def get_version_string(self, obj):
         """Return formatted version string like '2.1'."""
         return f"{obj.major_version}.{obj.minor_version}"
-    
+
+    def get_created_by_name(self, obj):
+        """Return full name of the creator."""
+        if obj.created_by:
+            name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+            return name or obj.created_by.username
+        return None
+
+    def get_updated_by_name(self, obj):
+        """Return full name of the last updater."""
+        if obj.updated_by:
+            name = f"{obj.updated_by.first_name} {obj.updated_by.last_name}".strip()
+            return name or obj.updated_by.username
+        return None
+
     def get_current_checkout(self, obj):
         """Get the current active checkout if exists."""
         checkout = obj.get_active_checkout()
         if checkout:
             return DocumentCheckoutSerializer(checkout).data
         return None
-    
+
     def get_approval_status(self, obj):
         """Get approval status summary."""
         return obj.get_approval_status()

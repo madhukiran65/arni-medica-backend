@@ -105,7 +105,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
         'infocard_type',
         'department',
         'owner',
-        'locked_by'
+        'locked_by',
+        'created_by',
+        'updated_by'
     ).prefetch_related(
         'checkouts',
         'snapshots',
