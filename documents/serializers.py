@@ -615,6 +615,13 @@ class DocumentContentUpdateSerializer(serializers.Serializer):
     """Serializer for saving document content from the TipTap editor."""
     content = serializers.JSONField(required=True, help_text="TipTap ProseMirror JSON")
     content_html = serializers.CharField(required=False, default='', help_text="Rendered HTML")
+    editor_metadata = serializers.JSONField(required=False, default=dict, help_text="Editor UI state metadata")
+    header_content = serializers.CharField(required=False, default='', help_text="Header HTML content")
+    footer_content = serializers.CharField(required=False, default='', help_text="Footer HTML content")
+    page_color = serializers.CharField(required=False, default='', max_length=20, help_text="Page background color")
+    columns_count = serializers.IntegerField(required=False, default=1, help_text="Number of columns")
+    theme_id = serializers.CharField(required=False, default='office', max_length=50, help_text="Theme identifier")
+    watermark_text = serializers.CharField(required=False, default='', allow_blank=True, max_length=200, help_text="Watermark text")
 
 
 # ============================================================================

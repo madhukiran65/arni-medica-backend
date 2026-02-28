@@ -987,6 +987,38 @@ class Document(AuditedModel):
         default=dict,
         help_text="Flexible key-value pairs for client-specific requirements"
     )
+    # --- EDITOR METADATA FIELDS ---
+    editor_metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Stores all editor UI state (theme, page color, columns, page borders, headers/footers content, protection settings, etc.)"
+    )
+    header_content = models.TextField(
+        blank=True,
+        default='',
+        help_text="Header HTML content"
+    )
+    footer_content = models.TextField(
+        blank=True,
+        default='',
+        help_text="Footer HTML content"
+    )
+    page_color = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="Page background color"
+    )
+    columns_count = models.IntegerField(
+        default=1,
+        help_text="Number of columns in document layout"
+    )
+    theme_id = models.CharField(
+        max_length=50,
+        blank=True,
+        default='office',
+        help_text="Theme identifier for document styling"
+    )
     
     class Meta:
         ordering = ['-created_at']
@@ -1371,3 +1403,6 @@ class DocumentAcknowledgment(AuditedModel):
 
 
 # ElectronicSignature is defined in core.models — use core.ElectronicSignature
+
+
+# Editor Metadata Models - Added for document editor UI state persistence

@@ -1474,13 +1474,22 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         document.content = serializer.validated_data['content']
         document.content_html = serializer.validated_data.get('content_html', '')
+        
+        # Save editor metadata and formatting fields
+        document.editor_metadata = serializer.validated_data.get('editor_metadata', {})
+        document.header_content = serializer.validated_data.get('header_content', '')
+        document.footer_content = serializer.validated_data.get('footer_content', '')
+        document.page_color = serializer.validated_data.get('page_color', '')
+        document.columns_count = serializer.validated_data.get('columns_count', 1)
+        document.theme_id = serializer.validated_data.get('theme_id', 'office')
+        document.watermark_text = serializer.validated_data.get('watermark_text', '')
 
         # Extract plain text for search
         import re
         plain = re.sub(r'<[^>]+>', '', document.content_html)
         document.content_plain_text = plain[:50000]  # Limit for DB
 
-        document.save(update_fields=['content', 'content_html', 'content_plain_text', 'updated_at'])
+        document.save(update_fields=['content', 'content_html', 'content_plain_text', 'editor_metadata', 'header_content', 'footer_content', 'page_color', 'columns_count', 'theme_id', 'watermark_text', 'updated_at'])
 
         from core.models import AuditLog
         from django.contrib.contenttypes.models import ContentType
